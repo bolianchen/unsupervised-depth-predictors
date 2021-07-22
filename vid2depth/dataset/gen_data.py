@@ -38,6 +38,7 @@ from absl import logging
 import dataset_loader
 import numpy as np
 import scipy.misc
+import imageio
 import tensorflow as tf
 
 gfile = tf.gfile
@@ -50,6 +51,7 @@ DATASETS = [
 flags.DEFINE_enum('dataset_name', None, DATASETS, 'Dataset name.')
 flags.DEFINE_string('dataset_dir', None, 'Location for dataset source files.')
 flags.DEFINE_string('data_dir', None, 'Where to save the generated data.')
+flags.DEFINE_string('save_img_ext', 'png', 'image format to save')
 # Note: Training time grows linearly with sequence length.  Use 2 or 3.
 flags.DEFINE_integer('seq_length', 3, 'Length of each training sequence.')
 flags.DEFINE_integer('img_height', 128, 'Image height.')
@@ -132,7 +134,7 @@ def _generate_data():
       for index, frame_chunk in enumerate(frame_chunks):
         all_examples.clear()
         pool.map(_gen_example_star,
-                 itertools.izip(frame_chunk, itertools.repeat(all_examples)))
+                 zip(frame_chunk, itertools.repeat(all_examples)))
         logging.info('Chunk %d/%d: saving %s entries...', index + 1, NUM_CHUNKS,
                      len(all_examples))
         for _, example in all_examples.items():
@@ -162,8 +164,8 @@ def _gen_example(i, all_examples):
   save_dir = os.path.join(FLAGS.data_dir, example['folder_name'])
   if not gfile.Exists(save_dir):
     gfile.MakeDirs(save_dir)
-  img_filepath = os.path.join(save_dir, '%s.jpg' % example['file_name'])
-  scipy.misc.imsave(img_filepath, image_seq_stack.astype(np.uint8))
+  img_filepath = os.path.join(save_dir, f'{example["file_name"]}.{FLAGS.save_img_ext}')
+  imageio.imsave(img_filepath, image_seq_stack.astype(np.uint8))
   cam_filepath = os.path.join(save_dir, '%s_cam.txt' % example['file_name'])
   example['cam'] = '%f,0.,%f,0.,%f,%f,0.,0.,1.' % (fx, cx, fy, cy)
   with open(cam_filepath, 'w') as cam_f:

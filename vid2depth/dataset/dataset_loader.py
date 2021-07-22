@@ -25,7 +25,8 @@ import os
 import re
 from absl import logging
 import numpy as np
-import scipy.misc
+import imageio
+from PIL import Image
 
 CITYSCAPES_CROP_BOTTOM = True  # Crop bottom 25% to remove the car hood.
 CITYSCAPES_CROP_PCT = 0.75
@@ -102,7 +103,7 @@ class Bike(object):
     """Reads the image and crops it according to first letter of frame_id."""
     crop_type = frame_id[0]
     img_file = os.path.join(self.dataset_dir, frame_id[1:])
-    img = scipy.misc.imread(img_file)
+    img = imageio.imread(img_file)
     allowed_height = int(img.shape[1] * self.img_height / self.img_width)
     # Starting height for the middle crop.
     mid_crop_top = int(img.shape[0] / 2 - allowed_height / 2)
@@ -134,7 +135,8 @@ class Bike(object):
       if idx == target_index:
         zoom_y = self.img_height / img.shape[0]
         zoom_x = self.img_width / img.shape[1]
-      img = scipy.misc.imresize(img, (self.img_height, self.img_width))
+      # notice the default mode for RGB images is BICUBIC
+      img = np.array(Image.fromarray(img).resize((self.img_width, self.img_height)))
       image_seq.append(img)
     return image_seq, zoom_x, zoom_y, cy
 
@@ -206,24 +208,29 @@ class KittiRaw(object):
     all_frames = []
     for date in self.date_list:
       date_dir = os.path.join(self.dataset_dir, date)
-      drive_set = os.listdir(date_dir)
-      for dr in drive_set:
-        drive_dir = os.path.join(date_dir, dr)
-        if os.path.isdir(drive_dir):
-          if dr[:-5] in self.test_scenes:
-            continue
-          for cam in self.cam_ids:
-            img_dir = os.path.join(drive_dir, 'image_' + cam, 'data')
-            num_frames = len(glob.glob(img_dir + '/*[0-9].png'))
-            for i in range(num_frames):
-              frame_id = '%.10d' % i
-              all_frames.append(dr + ' ' + cam + ' ' + frame_id)
+      if os.path.isdir(date_dir):
+          drive_set = os.listdir(date_dir)
+          for dr in drive_set:
+            drive_dir = os.path.join(date_dir, dr)
+            if os.path.isdir(drive_dir):
+              if dr[:-5] in self.test_scenes:
+                continue
+              for cam in self.cam_ids:
+                img_dir = os.path.join(drive_dir, 'image_' + cam, 'data')
+                num_frames = len(glob.glob(img_dir + '/*[0-9].png'))
+                for i in range(num_frames):
+                  frame_id = '%.10d' % i
+                  all_frames.append(dr + ' ' + cam + ' ' + frame_id)
+
+    assert len(all_frames)>0, 'no kitti data found in the dataset_dir'
 
     for s in self.static_frames:
       try:
         all_frames.remove(s)
       except ValueError:
         pass
+
+    assert len(all_frames)>0, 'all data are static_frames'
 
     self.train_frames = all_frames
     self.num_train = len(self.train_frames)
@@ -258,7 +265,8 @@ class KittiRaw(object):
       if index == target_index:
         zoom_y = self.img_height / img.shape[0]
         zoom_x = self.img_width / img.shape[1]
-      img = scipy.misc.imresize(img, (self.img_height, self.img_width))
+      # notice the default mode for RGB images is BICUBIC
+      img = np.array(Image.fromarray(img).resize((self.img_width, self.img_height)))
       image_seq.append(img)
     return image_seq, zoom_x, zoom_y
 
@@ -309,7 +317,7 @@ class KittiRaw(object):
     date = drive[:10]
     img_file = os.path.join(self.dataset_dir, date, drive, 'image_' + cam_id,
                             'data', frame_id + '.png')
-    img = scipy.misc.imread(img_file)
+    img = imageio.imread(img_file)
     return img
 
   def load_intrinsics_raw(self, drive, cam_id):
@@ -403,7 +411,8 @@ class KittiOdom(object):
       if index == target_frame_index:
         zoom_y = self.img_height / img.shape[0]
         zoom_x = self.img_width / img.shape[1]
-      img = scipy.misc.imresize(img, (self.img_height, self.img_width))
+      # notice the default mode for RGB images is BICUBIC
+      img = np.array(Image.fromarray(img).resize((self.img_width, self.img_height)))
       image_seq.append(img)
     return image_seq, zoom_x, zoom_y
 
@@ -430,7 +439,7 @@ class KittiOdom(object):
   def load_image(self, drive, frame_id):
     img_file = os.path.join(self.dataset_dir, 'sequences',
                             '%s/image_2/%s.png' % (drive, frame_id))
-    img = scipy.misc.imread(img_file)
+    img = imageio.imread(img_file)
     return img
 
   def load_intrinsics(self, drive, unused_frame_id):
@@ -559,7 +568,7 @@ class Cityscapes(object):
       image_filepath = os.path.join(self.dataset_dir, 'leftImg8bit_sequence',
                                     self.split, city,
                                     frame_id + 'leftImg8bit.png')
-      img = scipy.misc.imread(image_filepath)
+      img = imageio.imread(image_filepath)
       if self.crop_bottom:
         ymax = int(img.shape[0] * self.crop_pct)
         img = img[:ymax]
@@ -567,7 +576,8 @@ class Cityscapes(object):
       if index == int(target_local_frame_id):
         zoom_y = self.img_height / raw_shape[0]
         zoom_x = self.img_width / raw_shape[1]
-      img = scipy.misc.imresize(img, (self.img_height, self.img_width))
+      # notice the default mode for RGB images is BICUBIC
+      img = np.array(Image.fromarray(img).resize((self.img_width, self.img_height)))
       image_seq.append(img)
     return image_seq, zoom_x, zoom_y
 
