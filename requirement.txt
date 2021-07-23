@@ -1,0 +1,16 @@
+imageio
+opencv-python
+numpy
+scipy
+Pillow
+cython
+scikit-image
+imgaug
+h5py==2.10.0
+tensorflow==1.15.0
+tensorflow-graphics==1.0.0
+matplotlib==3.3.0
+pycocotools
+keras==2.0.8
+IPython
+seaborn

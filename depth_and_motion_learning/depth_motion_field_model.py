@@ -29,7 +29,7 @@ from depth_and_motion_learning import object_motion_nets
 from depth_and_motion_learning import parameter_container
 from depth_and_motion_learning import transform_utils
 from depth_and_motion_learning.dataset import data_processing
-from depth_and_motion_learning.dataset import reader_cityscapes
+from depth_and_motion_learning.dataset import datasets_reader
 from depth_and_motion_learning.losses import loss_aggregator
 
 DEFAULT_PARAMS = {
@@ -309,7 +309,7 @@ def input_fn(params):
 
   params = parameter_container.ParameterContainer.from_defaults_and_overrides(
       DEFAULT_PARAMS, params, is_strict=True, strictness_depth=2)
-  dataset = reader_cityscapes.read_frame_pairs_from_data_path(
+  dataset = datasets_reader.read_frame_pairs_from_data_path(
       params.input.data_path, params.input.reader)
 
   if params.learn_intrinsics.enabled and params.learn_intrinsics.per_video:
