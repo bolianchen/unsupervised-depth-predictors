@@ -24,11 +24,13 @@ import math
 import os
 import random
 import time
-from absl import app
-from absl import flags
-from absl import logging
 import numpy as np
 import tensorflow as tf
+
+from absl import app
+from absl import logging
+from absl import flags
+#flags = tf.app.flags
 
 import model
 import nets
@@ -205,6 +207,11 @@ def train(train_model, pretrained_ckpt, imagenet_ckpt, checkpoint_dir,
                            saver=None)
   config = tf.ConfigProto()
   config.gpu_options.allow_growth = True
+  # eliminate errors from ArithmicOptimization
+  from tensorflow.core.protobuf import rewriter_config_pb2
+  off = rewriter_config_pb2.RewriterConfig.OFF
+  config.graph_options.rewrite_options.memory_optimization  = off
+
   with sv.managed_session(config=config) as sess:
     if pretrained_ckpt is not None or imagenet_ckpt:
       logging.info('Restoring pretrained weights from %s', ckpt_path)
