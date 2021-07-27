@@ -45,9 +45,9 @@ KITTI_raw/
 
 
 ## Model Training
-- struct2depth:
+**struct2depth**:
 ```
-$
+$python train.py --logtostderr --checkpoint_dir ../test_struct2depth --data_dir ../KITTI_processed/ --architecture resnet
 ```
 - vid2depth:
 ```
