@@ -51,7 +51,11 @@ DEFAULT_PARAMS = {
         'prefetch_size': 32,
 
         # Allows arbitrary parameters to be passed to the reader.
-        'reader': {},
+        'reader': {
+            # True to use a pretrained mask network to confine moving objects.
+            'use_mask': False,
+            'learn_egomotion': True
+            },
     },
     'image_preprocessing': {
         'data_augmentation': True,
@@ -103,9 +107,6 @@ DEFAULT_PARAMS = {
 
     # True to feed depth predictions into the motion field network.
     'cascade': True,
-    # True to use a pretrained mask network to confine moving objects.
-    'use_mask': False,
-    'learn_egomotion': True,
 
     # Number of pixels ro dilate the foreground mask by (0 to not dilate).
     'foreground_dilation': 8,
@@ -217,14 +218,14 @@ def loss_fn(features, mode, params):
                                              1.0)
 
   # If using grouth truth egomotion
-  if not params.learn_egomotion:
+  if not params.input.reader.learn_egomotion:
     egomotion_mat = tf.concat(features['egomotion_mat'], axis=0)
     rot = transform_utils.angles_from_matrix(egomotion_mat[:, :3, :3])
     trans = egomotion_mat[:, :3, 3]
     trans = tf.expand_dims(trans, 1)
     trans = tf.expand_dims(trans, 1)
 
-  if params.use_mask:
+  if params.input.reader.use_mask:
     mask = tf.to_float(tf.concat(features['mask'], axis=0) > 0)
     if params.foreground_dilation > 0:
       pool_size = params.foreground_dilation * 2 + 1

@@ -118,7 +118,9 @@ def read_frame_sequence_from_data_path(train_file_path,
   ds = ds.repeat()
 
   def parse_fn_for_pairs(filename):
-    return parse_fn(filename, output_sequence_length=sequence_length)
+    return parse_fn(filename,
+                    use_mask=params.use_mask,
+                    output_sequence_length=sequence_length)
 
   num_parallel_calls = min(len(lines), params.num_parallel_calls)
   ds = ds.map(parse_fn_for_pairs, num_parallel_calls=num_parallel_calls)
