@@ -155,7 +155,9 @@ def _gen_example(i, all_examples):
   if not example:
     return
   image_seq_stack = _stack_image_seq(example['image_seq'])
+  mask_seq_stack = _stack_image_seq(example['mask_seq'])
   example.pop('image_seq', None)  # Free up memory.
+  example.pop('mask_seq', None)  # Free up memory.
   intrinsics = example['intrinsics']
   fx = intrinsics[0, 0]
   fy = intrinsics[1, 1]
@@ -165,7 +167,9 @@ def _gen_example(i, all_examples):
   if not gfile.Exists(save_dir):
     gfile.MakeDirs(save_dir)
   img_filepath = os.path.join(save_dir, f'{example["file_name"]}.{FLAGS.save_img_ext}')
+  mask_filepath = os.path.join(save_dir, f'{example["file_name"]}-fseg.{FLAGS.save_img_ext}')
   imageio.imsave(img_filepath, image_seq_stack.astype(np.uint8))
+  imageio.imsave(mask_filepath, mask_seq_stack.astype(np.uint8))
   cam_filepath = os.path.join(save_dir, '%s_cam.txt' % example['file_name'])
   example['cam'] = '%f,0.,%f,0.,%f,%f,0.,0.,1.' % (fx, cx, fy, cy)
   with open(cam_filepath, 'w') as cam_f:

@@ -27,6 +27,7 @@ from absl import logging
 import numpy as np
 import imageio
 from PIL import Image
+from data_util import gen_mask
 
 CITYSCAPES_CROP_BOTTOM = True  # Crop bottom 25% to remove the car hood.
 CITYSCAPES_CROP_PCT = 0.75
@@ -298,6 +299,8 @@ class KittiRaw(object):
     example['image_seq'] = image_seq
     example['folder_name'] = target_drive + '_' + target_cam_id + '/'
     example['file_name'] = target_frame_id
+    #print('image_seq type is ' + str(type(image_seq[0]))+ str(len(image_seq)))
+    example['mask_seq'] = gen_mask(image_seq)
     if self.load_pose:
       pose_seq = self.load_pose_sequence(frames, target_index)
       example['pose_seq'] = pose_seq
