@@ -19,8 +19,9 @@ The codes to generate segmentation masks of the training images in order to lear
 ## KITTI Data Preparation
 **Download Raw Data**
 
-```shell
-$ ./kitti_raw_downloader.sh full_version
+```bash
+$ version=full_version  # choose among (tiny_version, mini_version, full_version)
+$ ./kitti_raw_downloader.sh $version
 ```
 The downloaded data is put in `KITTI_raw` directory with the following structure:
 ```
@@ -46,8 +47,12 @@ KITTI_raw/
 
 ## Model Training
 **struct2depth**:
+
 ```
-$python train.py --logtostderr --checkpoint_dir ../test_struct2depth --data_dir ../KITTI_processed/ --architecture resnet
+$python train.py --logtostderr \
+                 --checkpoint_dir ../test_struct2depth \
+                 --data_dir ../KITTI_processed/ \
+                 --architecture resnet
 ```
 - vid2depth:
 ```
