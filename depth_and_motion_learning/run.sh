@@ -13,26 +13,19 @@
 # limitations under the License.
 
 #!/bin/bash
-set -e
-set -x
-
-virtualenv -p python3 .
-source ./bin/activate
-
-pip install tensorflow==1.15.0
-pip install tensorflow-graphics==1.0.0
-pip install matplotlib==3.3.0
-pip install -r depth_and_motion_learning/requirements.txt
+set -e # stop the execution of a script if a command or pipeline has an error
+set -x # print all executed commands to the terminal
 
 python -m depth_and_motion_learning.depth_motion_field_train \
-  --model_dir=/tmp/my_experiment \
+  --model_dir=../test_motion \
   --param_overrides='{
     "model": {
       "input": {
-        "data_path": "depth_from_video_in_the_wild/data_example/train.txt"
+        "data_path": "KITTI_processed/train.txt"
       }
     },
     "trainer": {
-      "max_steps": 1
+      "init_ckpt": "Imagenet_ckpt/model.ckpt",
+      "init_ckpt_type": "imagenet",
     }
   }'
