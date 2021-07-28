@@ -4,20 +4,23 @@ import numpy as np
 import skimage
 import cv2
 
+file_path = os.path.abspath(__file__)
+
 # Root directory of the RCNN repository
-ROOT_DIR = os.path.abspath("../Mask_RCNN")
-sys.path.append(ROOT_DIR)  # To find local version of the library
+MRCNN_DIR = os.path.join(os.path.dirname(os.path.dirname(file_path)), 'Mask_RCNN')
+
+sys.path.append(MRCNN_DIR)  # To find local version of the library
+sys.path.append(os.path.join(MRCNN_DIR, "samples/coco/"))
+
 # Import Mask RCNN
 from mrcnn import utils
 import mrcnn.model as modellib
 from mrcnn import visualize
-
 # Import COCO config
-sys.path.append(os.path.join(ROOT_DIR, "samples/coco/"))
 import coco
 
 # Directory to save logs and trained model
-MODEL_DIR = os.path.join(ROOT_DIR, "logs")
+MODEL_DIR = os.path.join(MRCNN_DIR, "logs")
 
 class InferenceConfig(coco.CocoConfig):
     # Set batch size to 1 since we'll be running inference on
@@ -29,7 +32,7 @@ class InferenceConfig(coco.CocoConfig):
 def gen_mask(images):
     if isinstance(images, list):
         # Local path to trained weights file
-        COCO_MODEL_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
+        COCO_MODEL_PATH = os.path.join(MRCNN_DIR, "mask_rcnn_coco.h5")
         # Download COCO trained weights from Releases if needed
         if not os.path.exists(COCO_MODEL_PATH):
             utils.download_trained_weights(COCO_MODEL_PATH)

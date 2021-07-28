@@ -34,137 +34,6 @@ CITYSCAPES_CROP_PCT = 0.75
 CITYSCAPES_SAMPLE_EVERY = 2  # Sample every 2 frames to match KITTI frame rate.
 BIKE_SAMPLE_EVERY = 6  # 5fps, since the bike's motion is slower.
 
-
-class Bike(object):
-  """Load bike video frames."""
-
-  def __init__(self,
-               dataset_dir,
-               img_height=128,
-               img_width=416,
-               seq_length=3,
-               sample_every=BIKE_SAMPLE_EVERY):
-    self.dataset_dir = dataset_dir
-    self.img_height = img_height
-    self.img_width = img_width
-    self.seq_length = seq_length
-    self.sample_every = sample_every
-    self.frames = self.collect_frames()
-    self.num_frames = len(self.frames)
-    self.num_train = self.num_frames
-    logging.info('Total frames collected: %d', self.num_frames)
-
-  def collect_frames(self):
-    """Create a list of unique ids for available frames."""
-    video_list = os.listdir(self.dataset_dir)
-    logging.info('video_list: %s', video_list)
-    frames = []
-    for video in video_list:
-      im_files = glob.glob(os.path.join(self.dataset_dir, video, '*.jpg'))
-      im_files = sorted(im_files, key=natural_keys)
-      # Adding 3 crops of the video.
-      frames.extend(['A' + video + '/' + os.path.basename(f) for f in im_files])
-      frames.extend(['B' + video + '/' + os.path.basename(f) for f in im_files])
-      frames.extend(['C' + video + '/' + os.path.basename(f) for f in im_files])
-    return frames
-
-  def get_example_with_index(self, target_index):
-    if not self.is_valid_sample(target_index):
-      return False
-    example = self.load_example(target_index)
-    return example
-
-  def load_intrinsics(self, unused_frame_idx, cy):
-    """Load intrinsics."""
-    # https://www.wired.com/2013/05/calculating-the-angular-view-of-an-iphone/
-    # https://codeyarns.com/2015/09/08/how-to-compute-intrinsic-camera-matrix-for-a-camera/
-    # https://stackoverflow.com/questions/39992968/how-to-calculate-field-of-view-of-the-camera-from-camera-intrinsic-matrix
-    # # iPhone: These numbers are for images with resolution 720 x 1280.
-    # Assuming FOV = 50.9 => fx = (1280 // 2) / math.tan(fov / 2) = 1344.8
-    intrinsics = np.array([[1344.8, 0, 1280 // 2],
-                           [0, 1344.8, cy],
-                           [0, 0, 1.0]])
-    return intrinsics
-
-  def is_valid_sample(self, target_index):
-    """Checks whether we can find a valid sequence around this frame."""
-    target_video, _ = self.frames[target_index].split('/')
-    start_index, end_index = get_seq_start_end(target_index,
-                                               self.seq_length,
-                                               self.sample_every)
-    if start_index < 0 or end_index >= self.num_frames:
-      return False
-    start_video, _ = self.frames[start_index].split('/')
-    end_video, _ = self.frames[end_index].split('/')
-    if target_video == start_video and target_video == end_video:
-      return True
-    return False
-
-  def load_image_raw(self, frame_id):
-    """Reads the image and crops it according to first letter of frame_id."""
-    crop_type = frame_id[0]
-    img_file = os.path.join(self.dataset_dir, frame_id[1:])
-    img = imageio.imread(img_file)
-    allowed_height = int(img.shape[1] * self.img_height / self.img_width)
-    # Starting height for the middle crop.
-    mid_crop_top = int(img.shape[0] / 2 - allowed_height / 2)
-    # How much to go up or down to get the other two crops.
-    height_var = int(mid_crop_top / 3)
-    if crop_type == 'A':
-      crop_top = mid_crop_top - height_var
-      cy = allowed_height / 2 + height_var
-    elif crop_type == 'B':
-      crop_top = mid_crop_top
-      cy = allowed_height / 2
-    elif crop_type == 'C':
-      crop_top = mid_crop_top + height_var
-      cy = allowed_height / 2 - height_var
-    else:
-      raise ValueError('Unknown crop_type: %s' % crop_type)
-    crop_bottom = crop_top + allowed_height + 1
-    return img[crop_top:crop_bottom, :, :], cy
-
-  def load_image_sequence(self, target_index):
-    """Returns a list of images around target index."""
-    start_index, end_index = get_seq_start_end(target_index,
-                                               self.seq_length,
-                                               self.sample_every)
-    image_seq = []
-    for idx in range(start_index, end_index + 1, self.sample_every):
-      frame_id = self.frames[idx]
-      img, cy = self.load_image_raw(frame_id)
-      if idx == target_index:
-        zoom_y = self.img_height / img.shape[0]
-        zoom_x = self.img_width / img.shape[1]
-      # notice the default mode for RGB images is BICUBIC
-      img = np.array(Image.fromarray(img).resize((self.img_width, self.img_height)))
-      image_seq.append(img)
-    return image_seq, zoom_x, zoom_y, cy
-
-  def load_example(self, target_index):
-    """Returns a sequence with requested target frame."""
-    image_seq, zoom_x, zoom_y, cy = self.load_image_sequence(target_index)
-    target_video, target_filename = self.frames[target_index].split('/')
-    # Put A, B, C at the end for better shuffling.
-    target_video = target_video[1:] + target_video[0]
-    intrinsics = self.load_intrinsics(target_index, cy)
-    intrinsics = self.scale_intrinsics(intrinsics, zoom_x, zoom_y)
-    example = {}
-    example['intrinsics'] = intrinsics
-    example['image_seq'] = image_seq
-    example['folder_name'] = target_video
-    example['file_name'] = target_filename.split('.')[0]
-    return example
-
-  def scale_intrinsics(self, mat, sx, sy):
-    out = np.copy(mat)
-    out[0, 0] *= sx
-    out[0, 2] *= sx
-    out[1, 1] *= sy
-    out[1, 2] *= sy
-    return out
-
-
 class KittiRaw(object):
   """Reads KITTI raw data files."""
 
@@ -175,8 +44,8 @@ class KittiRaw(object):
                img_height=128,
                img_width=416,
                seq_length=3):
-    static_frames_file = 'dataset/kitti/static_frames.txt'
-    test_scene_file = 'dataset/kitti/test_scenes_' + split + '.txt'
+    static_frames_file = 'data_prep/kitti/static_frames.txt'
+    test_scene_file = 'data_prep/kitti/test_scenes_' + split + '.txt'
     with open(get_resource_path(test_scene_file), 'r') as f:
       test_scenes = f.readlines()
     self.test_scenes = [t[:-1] for t in test_scenes]
@@ -353,6 +222,137 @@ class KittiRaw(object):
     out[1, 1] *= sy
     out[1, 2] *= sy
     return out
+
+class Bike(object):
+  """Load bike video frames."""
+
+  def __init__(self,
+               dataset_dir,
+               img_height=128,
+               img_width=416,
+               seq_length=3,
+               sample_every=BIKE_SAMPLE_EVERY):
+    self.dataset_dir = dataset_dir
+    self.img_height = img_height
+    self.img_width = img_width
+    self.seq_length = seq_length
+    self.sample_every = sample_every
+    self.frames = self.collect_frames()
+    self.num_frames = len(self.frames)
+    self.num_train = self.num_frames
+    logging.info('Total frames collected: %d', self.num_frames)
+
+  def collect_frames(self):
+    """Create a list of unique ids for available frames."""
+    video_list = os.listdir(self.dataset_dir)
+    logging.info('video_list: %s', video_list)
+    frames = []
+    for video in video_list:
+      im_files = glob.glob(os.path.join(self.dataset_dir, video, '*.jpg'))
+      im_files = sorted(im_files, key=natural_keys)
+      # Adding 3 crops of the video.
+      frames.extend(['A' + video + '/' + os.path.basename(f) for f in im_files])
+      frames.extend(['B' + video + '/' + os.path.basename(f) for f in im_files])
+      frames.extend(['C' + video + '/' + os.path.basename(f) for f in im_files])
+    return frames
+
+  def get_example_with_index(self, target_index):
+    if not self.is_valid_sample(target_index):
+      return False
+    example = self.load_example(target_index)
+    return example
+
+  def load_intrinsics(self, unused_frame_idx, cy):
+    """Load intrinsics."""
+    # https://www.wired.com/2013/05/calculating-the-angular-view-of-an-iphone/
+    # https://codeyarns.com/2015/09/08/how-to-compute-intrinsic-camera-matrix-for-a-camera/
+    # https://stackoverflow.com/questions/39992968/how-to-calculate-field-of-view-of-the-camera-from-camera-intrinsic-matrix
+    # # iPhone: These numbers are for images with resolution 720 x 1280.
+    # Assuming FOV = 50.9 => fx = (1280 // 2) / math.tan(fov / 2) = 1344.8
+    intrinsics = np.array([[1344.8, 0, 1280 // 2],
+                           [0, 1344.8, cy],
+                           [0, 0, 1.0]])
+    return intrinsics
+
+  def is_valid_sample(self, target_index):
+    """Checks whether we can find a valid sequence around this frame."""
+    target_video, _ = self.frames[target_index].split('/')
+    start_index, end_index = get_seq_start_end(target_index,
+                                               self.seq_length,
+                                               self.sample_every)
+    if start_index < 0 or end_index >= self.num_frames:
+      return False
+    start_video, _ = self.frames[start_index].split('/')
+    end_video, _ = self.frames[end_index].split('/')
+    if target_video == start_video and target_video == end_video:
+      return True
+    return False
+
+  def load_image_raw(self, frame_id):
+    """Reads the image and crops it according to first letter of frame_id."""
+    crop_type = frame_id[0]
+    img_file = os.path.join(self.dataset_dir, frame_id[1:])
+    img = imageio.imread(img_file)
+    allowed_height = int(img.shape[1] * self.img_height / self.img_width)
+    # Starting height for the middle crop.
+    mid_crop_top = int(img.shape[0] / 2 - allowed_height / 2)
+    # How much to go up or down to get the other two crops.
+    height_var = int(mid_crop_top / 3)
+    if crop_type == 'A':
+      crop_top = mid_crop_top - height_var
+      cy = allowed_height / 2 + height_var
+    elif crop_type == 'B':
+      crop_top = mid_crop_top
+      cy = allowed_height / 2
+    elif crop_type == 'C':
+      crop_top = mid_crop_top + height_var
+      cy = allowed_height / 2 - height_var
+    else:
+      raise ValueError('Unknown crop_type: %s' % crop_type)
+    crop_bottom = crop_top + allowed_height + 1
+    return img[crop_top:crop_bottom, :, :], cy
+
+  def load_image_sequence(self, target_index):
+    """Returns a list of images around target index."""
+    start_index, end_index = get_seq_start_end(target_index,
+                                               self.seq_length,
+                                               self.sample_every)
+    image_seq = []
+    for idx in range(start_index, end_index + 1, self.sample_every):
+      frame_id = self.frames[idx]
+      img, cy = self.load_image_raw(frame_id)
+      if idx == target_index:
+        zoom_y = self.img_height / img.shape[0]
+        zoom_x = self.img_width / img.shape[1]
+      # notice the default mode for RGB images is BICUBIC
+      img = np.array(Image.fromarray(img).resize((self.img_width, self.img_height)))
+      image_seq.append(img)
+    return image_seq, zoom_x, zoom_y, cy
+
+  def load_example(self, target_index):
+    """Returns a sequence with requested target frame."""
+    image_seq, zoom_x, zoom_y, cy = self.load_image_sequence(target_index)
+    target_video, target_filename = self.frames[target_index].split('/')
+    # Put A, B, C at the end for better shuffling.
+    target_video = target_video[1:] + target_video[0]
+    intrinsics = self.load_intrinsics(target_index, cy)
+    intrinsics = self.scale_intrinsics(intrinsics, zoom_x, zoom_y)
+    example = {}
+    example['intrinsics'] = intrinsics
+    example['image_seq'] = image_seq
+    example['folder_name'] = target_video
+    example['file_name'] = target_filename.split('.')[0]
+    return example
+
+  def scale_intrinsics(self, mat, sx, sy):
+    out = np.copy(mat)
+    out[0, 0] *= sx
+    out[0, 2] *= sx
+    out[1, 1] *= sy
+    out[1, 2] *= sy
+    return out
+
+
 
 
 class KittiOdom(object):
