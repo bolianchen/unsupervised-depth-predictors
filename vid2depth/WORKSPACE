@@ -8,6 +8,7 @@ workspace(name = "vid2depth")
 # 3. Request the new archive to be mirrored on mirror.bazel.build for more
 #    reliable downloads.
 load(":repo.bzl", "tensorflow_http_archive")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 tensorflow_http_archive(
     name = "org_tensorflow",
