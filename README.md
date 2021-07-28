@@ -19,8 +19,9 @@ The codes to generate segmentation masks of the training images in order to lear
 ## KITTI Data Preparation
 **Download Raw Data**
 
-```shell
-$ ./kitti_raw_downloader.sh full_version
+```bash
+$ version=full_version  # choose among (tiny_version, mini_version, full_version)
+$ ./kitti_raw_downloader.sh $version
 ```
 The downloaded data is put in `KITTI_raw` directory with the following structure:
 ```
@@ -45,9 +46,13 @@ KITTI_raw/
 
 
 ## Model Training
-- struct2depth:
+**struct2depth**:
+
 ```
-$
+$python train.py --logtostderr \
+                 --checkpoint_dir ../test_struct2depth \
+                 --data_dir ../KITTI_processed/ \
+                 --architecture resnet
 ```
 - vid2depth:
 ```
@@ -55,11 +60,25 @@ $
 ```
 - depth_from_video_in_the_wild:
 ```
-$
+$ python -m depth_from_video_in_the_wild.train --checkpoint_dir=$MY_CHECKPOINT_DIR \
+                                               --data_dir=$MY_DATA_DIR \
+                                               --imagenet_ckpt=$MY_IMAGENET_CHECKPOINT
 ```
+
 - depth_and_motion_learning:
 ```
-$
+$ python -m depth_and_motion_learning.depth_motion_field_train --model_dir=../test_motion \
+                                                               --param_overrides='{
+                                                                 "model": { 
+                                                                   "input": {
+                                                                     "data_path": "KITTI_processed/train.txt"
+                                                                   }
+                                                                 },
+                                                                 "trainer": {
+                                                                   "init_ckpt": "Imagenet_ckpt/model.ckpt",
+                                                                   "init_ckpt_type": "imagenet"
+                                                                 }
+                                                               }'
 ```
 
 ## Inference
