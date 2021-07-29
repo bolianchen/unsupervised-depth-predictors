@@ -61,7 +61,7 @@ KITTI_raw/
 
 
 ## Model Training
-**struct2depth**:
+#### struct2depth:
 
 ```
 $python struct2depth/train.py --logtostderr \
@@ -71,7 +71,7 @@ $python struct2depth/train.py --logtostderr \
                               --imagenet_ckpt ./Imagenet_ckpt/model.ckpt
                               --epochs 20
 ```
-- vid2depth:
+#### vid2depth:
 ```
 $
 ```
@@ -82,7 +82,7 @@ $ python -m depth_from_video_in_the_wild.train --checkpoint_dir=$MY_CHECKPOINT_D
                                                --imagenet_ckpt=$MY_IMAGENET_CHECKPOINT
 ```
 
-- depth_and_motion_learning:
+#### depth_and_motion_learning:
 ```
 $ python -m depth_and_motion_learning.depth_motion_field_train --model_dir=../test_motion \
                                                                --param_overrides='{
@@ -99,7 +99,7 @@ $ python -m depth_and_motion_learning.depth_motion_field_train --model_dir=../te
 ```
 
 ## Inference
-**struct2depth**:
+#### struct2depth:
 ```
 
 ```
