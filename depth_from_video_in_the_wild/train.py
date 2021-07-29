@@ -68,7 +68,8 @@ flags.DEFINE_float('weight_reg', 1e-2, 'The amount of weight regularization to '
 flags.DEFINE_string('checkpoint_dir', None, 'Directory to save model '
                     'checkpoints.')
 
-flags.DEFINE_integer('train_steps', int(1e6), 'Number of training steps.')
+#flags.DEFINE_integer('train_steps', int(1e6), 'Number of training steps.')
+flags.DEFINE_integer('epochs', 20, 'Number of training epochs')
 
 flags.DEFINE_integer('summary_freq', 100, 'Save summaries every N steps.')
 
@@ -146,14 +147,14 @@ def main(_):
       queue_size=FLAGS.queue_size,
       input_file=FLAGS.input_file)
 
-  _train(train_model, FLAGS.checkpoint_dir, FLAGS.train_steps,
+  _train(train_model, FLAGS.checkpoint_dir, FLAGS.epochs,
          FLAGS.summary_freq)
 
   if FLAGS.debug:
     _print_losses(os.path.join(FLAGS.checkpoint_dir, 'debug'))
 
 
-def _train(train_model, checkpoint_dir, train_steps, summary_freq):
+def _train(train_model, checkpoint_dir, epochs, summary_freq):
   """Runs a trainig loop."""
   saver = train_model.saver
   sv = tf.train.Supervisor(logdir=checkpoint_dir, save_summaries_secs=0,
@@ -170,10 +171,12 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
       logging.info('Restoring pretrained weights from %s', FLAGS.imagenet_ckpt)
       train_model.imagenet_init_restorer.restore(sess, FLAGS.imagenet_ckpt)
 
+    steps_per_epoch = train_model.reader.steps_per_epoch
+    train_steps = steps_per_epoch * epochs
+    logging.info(f'{train_steps} steps in total for {epochs} epochs')
     logging.info('Training...')
     start_time = time.time()
     last_summary_time = time.time()
-    steps_per_epoch = train_model.reader.steps_per_epoch
     step = 1
     while step <= train_steps:
       fetches = {

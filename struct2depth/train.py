@@ -84,7 +84,7 @@ flags.DEFINE_string('imagenet_ckpt', None, 'Initialize the weights according '
                     'architecture to be ResNet-18.')
 flags.DEFINE_string('checkpoint_dir', None, 'Directory to save model '
                     'checkpoints.')
-flags.DEFINE_integer('train_steps', 10000000, 'Number of training steps.')
+flags.DEFINE_integer('epochs', 20, 'Number of training epochs')
 flags.DEFINE_integer('summary_freq', 100, 'Save summaries every N steps.')
 flags.DEFINE_bool('depth_upsampling', True, 'Whether to apply depth '
                   'upsampling of lower-scale representations before warping to '
@@ -186,11 +186,11 @@ def main(_):
                             size_constraint_weight=FLAGS.size_constraint_weight)
 
   train(train_model, FLAGS.pretrained_ckpt, FLAGS.imagenet_ckpt,
-        FLAGS.checkpoint_dir, FLAGS.train_steps, FLAGS.summary_freq)
+        FLAGS.checkpoint_dir, FLAGS.epochs, FLAGS.summary_freq)
 
 
 def train(train_model, pretrained_ckpt, imagenet_ckpt, checkpoint_dir,
-          train_steps, summary_freq):
+          epochs, summary_freq):
   """Train model."""
   vars_to_restore = None
   if pretrained_ckpt is not None:
@@ -223,10 +223,12 @@ def train(train_model, pretrained_ckpt, imagenet_ckpt, checkpoint_dir,
     if checkpoint:
       saver.restore(sess, checkpoint)
 
-    logging.info('Training...')
     start_time = time.time()
     last_summary_time = time.time()
     steps_per_epoch = train_model.reader.steps_per_epoch
+    train_steps = steps_per_epoch * epochs
+    logging.info(f'{train_steps} steps in total for {epochs} epochs')
+    logging.info('Training...')
     step = 1
     while step <= train_steps:
       fetches = {

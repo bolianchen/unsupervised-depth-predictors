@@ -65,7 +65,7 @@ flags.DEFINE_string('pretrained_ckpt', None, 'Path to checkpoint with '
                     'pretrained weights.  Do not include .data* extension.')
 flags.DEFINE_string('checkpoint_dir', DEFAULT_CHECKPOINT_DIR,
                     'Directory to save model checkpoints.')
-flags.DEFINE_integer('train_steps', 200000, 'Number of training steps.')
+flags.DEFINE_integer('epochs', 20, 'Number of training epochs')
 flags.DEFINE_integer('summary_freq', 100, 'Save summaries every N steps.')
 flags.DEFINE_bool('legacy_mode', False, 'Whether to limit losses to using only '
                   'the middle frame in sequence as the target frame.')
@@ -103,10 +103,10 @@ def main(_):
                             legacy_mode=FLAGS.legacy_mode)
 
   train(train_model, FLAGS.pretrained_ckpt, FLAGS.checkpoint_dir,
-        FLAGS.train_steps, FLAGS.summary_freq)
+        FLAGS.epochs, FLAGS.summary_freq)
 
 
-def train(train_model, pretrained_ckpt, checkpoint_dir, train_steps,
+def train(train_model, pretrained_ckpt, checkpoint_dir, epochs,
           summary_freq):
   """Train model."""
   if pretrained_ckpt is not None:
@@ -129,10 +129,12 @@ def train(train_model, pretrained_ckpt, checkpoint_dir, train_steps,
     if checkpoint:
       saver.restore(sess, checkpoint)
 
-    logging.info('Training...')
     start_time = time.time()
     last_summary_time = time.time()
     steps_per_epoch = train_model.reader.steps_per_epoch
+    train_steps = steps_per_epoch * epochs
+    logging.info(f'{train_steps} steps in total for {epochs} epochs')
+    logging.info('Training...')
     step = 1
     while step <= train_steps:
       fetches = {
