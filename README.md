@@ -69,6 +69,7 @@ $python struct2depth/train.py --logtostderr \
                               --data_dir ./KITTI_processed \
                               --architecture resnet \
                               --imagenet_ckpt ./Imagenet_ckpt/model.ckpt
+                              --epochs 20
 ```
 - vid2depth:
 ```
@@ -98,3 +99,7 @@ $ python -m depth_and_motion_learning.depth_motion_field_train --model_dir=../te
 ```
 
 ## Inference
+**struct2depth**:
+```
+
+```
