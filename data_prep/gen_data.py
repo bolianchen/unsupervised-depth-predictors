@@ -59,7 +59,7 @@ flags.DEFINE_integer('img_width', 416, 'Image width.')
 flags.DEFINE_integer(
     'num_threads', None, 'Number of worker threads. '
     'Defaults to number of CPU cores.')
-
+flags.DEFINE_string('gen_mask', None, 'Where to save the generated data.')
 flags.mark_flag_as_required('dataset_name')
 flags.mark_flag_as_required('dataset_dir')
 flags.mark_flag_as_required('data_dir')
@@ -89,7 +89,8 @@ def _generate_data():
                                          split='eigen',
                                          img_height=FLAGS.img_height,
                                          img_width=FLAGS.img_width,
-                                         seq_length=FLAGS.seq_length)
+                                         seq_length=FLAGS.seq_length,
+                                         gen_mask=FLAGS.gen_mask)
   elif FLAGS.dataset_name == 'kitti_raw_stereo':
     dataloader = dataset_loader.KittiRaw(FLAGS.dataset_dir,
                                          split='stereo',
@@ -114,39 +115,62 @@ def _generate_data():
   #   logging.info('Generated: %d', len(all_examples))
 
   all_frames = range(dataloader.num_train)
-  frame_chunks = np.array_split(all_frames, NUM_CHUNKS)
-
-  manager = multiprocessing.Manager()
-  all_examples = manager.dict()
-  num_cores = multiprocessing.cpu_count()
-  num_threads = num_cores if FLAGS.num_threads is None else FLAGS.num_threads
-  pool = multiprocessing.Pool(num_threads)
-
   # Split into training/validation sets. Fixed seed for repeatability.
   np.random.seed(8964)
 
-  if not gfile.Exists(FLAGS.data_dir):
-    gfile.MakeDirs(FLAGS.data_dir)
+  if FLAGS.gen_mask:
+      all_examples ={}
 
-  with gfile.Open(os.path.join(FLAGS.data_dir, 'train.txt'), 'w') as train_f:
-    with gfile.Open(os.path.join(FLAGS.data_dir, 'val.txt'), 'w') as val_f:
-      logging.info('Generating data...')
-      for index, frame_chunk in enumerate(frame_chunks):
-        all_examples.clear()
-        pool.map(_gen_example_star,
-                 zip(frame_chunk, itertools.repeat(all_examples)))
-        logging.info('Chunk %d/%d: saving %s entries...', index + 1, NUM_CHUNKS,
-                     len(all_examples))
-        for _, example in all_examples.items():
-          if example:
-            s = example['folder_name']
-            frame = example['file_name']
-            if np.random.random() < 0.1:
-              val_f.write('%s %s\n' % (s, frame))
-            else:
-              train_f.write('%s %s\n' % (s, frame))
-  pool.close()
-  pool.join()
+      if not gfile.Exists(FLAGS.data_dir):
+        gfile.MakeDirs(FLAGS.data_dir)
+
+      with gfile.Open(os.path.join(FLAGS.data_dir, 'train.txt'), 'w') as train_f:
+        with gfile.Open(os.path.join(FLAGS.data_dir, 'val.txt'), 'w') as val_f:
+          logging.info('Generating data...')
+          for frame in all_frames:
+            # actually generating images and masks
+            _gen_example(frame, all_examples)
+
+          for _, example in all_examples.items():
+            if example:
+              s = example['folder_name']
+              frame = example['file_name']
+              if np.random.random() < 0.1:
+                val_f.write('%s %s\n' % (s, frame))
+              else:
+                train_f.write('%s %s\n' % (s, frame))
+
+  else:
+      frame_chunks = np.array_split(all_frames, NUM_CHUNKS)
+      manager = multiprocessing.Manager()
+      all_examples = manager.dict()
+      num_cores = multiprocessing.cpu_count()
+      num_threads = num_cores if FLAGS.num_threads is None else FLAGS.num_threads
+      pool = multiprocessing.Pool(num_threads)
+
+
+      if not gfile.Exists(FLAGS.data_dir):
+        gfile.MakeDirs(FLAGS.data_dir)
+
+      with gfile.Open(os.path.join(FLAGS.data_dir, 'train.txt'), 'w') as train_f:
+        with gfile.Open(os.path.join(FLAGS.data_dir, 'val.txt'), 'w') as val_f:
+          logging.info('Generating data...')
+          for index, frame_chunk in enumerate(frame_chunks):
+            all_examples.clear()
+            pool.map(_gen_example_star,
+                     zip(frame_chunk, itertools.repeat(all_examples)))
+            logging.info('Chunk %d/%d: saving %s entries...', index + 1, NUM_CHUNKS,
+                         len(all_examples))
+            for _, example in all_examples.items():
+              if example:
+                s = example['folder_name']
+                frame = example['file_name']
+                if np.random.random() < 0.1:
+                  val_f.write('%s %s\n' % (s, frame))
+                else:
+                  train_f.write('%s %s\n' % (s, frame))
+      pool.close()
+      pool.join()
 
 
 def _gen_example(i, all_examples):
@@ -155,9 +179,7 @@ def _gen_example(i, all_examples):
   if not example:
     return
   image_seq_stack = _stack_image_seq(example['image_seq'])
-  mask_seq_stack = _stack_image_seq(example['mask_seq'])
   example.pop('image_seq', None)  # Free up memory.
-  example.pop('mask_seq', None)  # Free up memory.
   intrinsics = example['intrinsics']
   fx = intrinsics[0, 0]
   fy = intrinsics[1, 1]
@@ -167,9 +189,15 @@ def _gen_example(i, all_examples):
   if not gfile.Exists(save_dir):
     gfile.MakeDirs(save_dir)
   img_filepath = os.path.join(save_dir, f'{example["file_name"]}.{FLAGS.save_img_ext}')
-  mask_filepath = os.path.join(save_dir, f'{example["file_name"]}-fseg.{FLAGS.save_img_ext}')
   imageio.imsave(img_filepath, image_seq_stack.astype(np.uint8))
-  imageio.imsave(mask_filepath, mask_seq_stack.astype(np.uint8))
+
+  if FLAGS.gen_mask:
+      mask_seq_stack = _stack_image_seq(example['mask_seq'])
+      example.pop('mask_seq', None)  # Free up memory.
+      mask_filepath = os.path.join(save_dir,
+                                   f'{example["file_name"]}-fseg.{FLAGS.save_img_ext}')
+      imageio.imsave(mask_filepath, mask_seq_stack.astype(np.uint8))
+
   cam_filepath = os.path.join(save_dir, '%s_cam.txt' % example['file_name'])
   example['cam'] = '%f,0.,%f,0.,%f,%f,0.,0.,1.' % (fx, cx, fy, cy)
   with open(cam_filepath, 'w') as cam_f:

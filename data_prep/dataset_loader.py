@@ -22,17 +22,35 @@ from __future__ import print_function
 import glob
 import json
 import os
+os.environ["TF_FORCE_GPU_ALLOW_GROWTH"]="true"
+import sys
 import re
 from absl import logging
 import numpy as np
 import imageio
 from PIL import Image
-from data_util import gen_mask
+file_path = os.path.abspath(__file__)
+# Root directory of the RCNN repository
+MRCNN_DIR = os.path.join(os.path.dirname(os.path.dirname(file_path)), 'Mask_RCNN')
+sys.path.append(MRCNN_DIR)  # To find local version of the library
+sys.path.append(os.path.join(MRCNN_DIR, "samples/coco/"))
+# Import Mask RCNN
+from mrcnn import utils
+import mrcnn.model as modellib
+from mrcnn import visualize
+# Import COCO config
+import coco
 
 CITYSCAPES_CROP_BOTTOM = True  # Crop bottom 25% to remove the car hood.
 CITYSCAPES_CROP_PCT = 0.75
 CITYSCAPES_SAMPLE_EVERY = 2  # Sample every 2 frames to match KITTI frame rate.
 BIKE_SAMPLE_EVERY = 6  # 5fps, since the bike's motion is slower.
+
+class InferenceConfig(coco.CocoConfig):
+    # Set batch size to 1 since we'll be running inference on
+    # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
+    GPU_COUNT = 1
+    IMAGES_PER_GPU = 1
 
 class KittiRaw(object):
   """Reads KITTI raw data files."""
@@ -43,7 +61,8 @@ class KittiRaw(object):
                load_pose=False,
                img_height=128,
                img_width=416,
-               seq_length=3):
+               seq_length=3,
+               gen_mask=False):
     static_frames_file = 'data_prep/kitti/static_frames.txt'
     test_scene_file = 'data_prep/kitti/test_scenes_' + split + '.txt'
     with open(get_resource_path(test_scene_file), 'r') as f:
@@ -53,6 +72,7 @@ class KittiRaw(object):
     self.img_height = img_height
     self.img_width = img_width
     self.seq_length = seq_length
+    self.gen_mask = gen_mask
     self.load_pose = load_pose
     self.cam_ids = ['02', '03']
     self.date_list = [
@@ -60,6 +80,36 @@ class KittiRaw(object):
     ]
     self.collect_static_frames(static_frames_file)
     self.collect_train_frames()
+    if self.gen_mask:
+        self._initialize_mrcnn_model()
+
+  def _initialize_mrcnn_model(self):
+    MODEL_DIR = os.path.join(MRCNN_DIR, "logs")
+
+    COCO_MODEL_PATH = os.path.join(MRCNN_DIR, "mask_rcnn_coco.h5")
+    # Download COCO trained weights from Releases if needed
+    if not os.path.exists(COCO_MODEL_PATH):
+        utils.download_trained_weights(COCO_MODEL_PATH)
+    config = InferenceConfig()
+    # Create model object in inference mode.
+    model =  modellib.MaskRCNN(mode="inference", model_dir=MODEL_DIR, config=config)
+    # Load weights trained on MS-COCO
+    model.load_weights(COCO_MODEL_PATH, by_name=True)
+    self.model = model
+
+  def _compute_mask(self, image):
+    results = self.model.detect([image], verbose=1)
+    result = results[0]
+    # Prepare black image
+    mask_base = np.zeros((image.shape[0],image.shape[1],image.shape[2]),np.uint8)
+    after_mask_img = image.copy()
+    color = (10, 10, 10) #white
+    number_of_objects=len(result['masks'][0,0])
+    mask_img=mask_base
+    for j in range(0,number_of_objects):
+        mask = result['masks'][:, :, j]
+        mask_img = visualize.apply_mask(mask_base, mask, color,alpha=1)
+    return mask_img
 
   def collect_static_frames(self, static_frames_file):
     with open(get_resource_path(static_frames_file), 'r') as f:
@@ -129,6 +179,8 @@ class KittiRaw(object):
     """Returns a sequence with requested target frame."""
     start_index, end_index = get_seq_start_end(target_index, self.seq_length)
     image_seq = []
+    if self.gen_mask:
+        mask_seq = []
     for index in range(start_index, end_index + 1):
       drive, cam_id, frame_id = frames[index].split(' ')
       img = self.load_image_raw(drive, cam_id, frame_id)
@@ -137,8 +189,13 @@ class KittiRaw(object):
         zoom_x = self.img_width / img.shape[1]
       # notice the default mode for RGB images is BICUBIC
       img = np.array(Image.fromarray(img).resize((self.img_width, self.img_height)))
+      if self.gen_mask:
+          mask_seq.append(self._compute_mask(img))
       image_seq.append(img)
-    return image_seq, zoom_x, zoom_y
+    if self.gen_mask:
+        return image_seq, mask_seq, zoom_x, zoom_y
+    else:
+        return image_seq, zoom_x, zoom_y
 
   def load_pose_sequence(self, frames, target_index):
     """Returns a sequence of pose vectors for frames around the target frame."""
@@ -158,18 +215,20 @@ class KittiRaw(object):
 
   def load_example(self, frames, target_index):
     """Returns a sequence with requested target frame."""
-    image_seq, zoom_x, zoom_y = self.load_image_sequence(frames, target_index)
+    example = {}
+    if self.gen_mask:
+        image_seq, mask_seq, zoom_x, zoom_y = self.load_image_sequence(frames, target_index)
+        example['mask_seq'] = mask_seq
+    else:
+        image_seq, zoom_x, zoom_y = self.load_image_sequence(frames, target_index)
     target_drive, target_cam_id, target_frame_id = (
         frames[target_index].split(' '))
     intrinsics = self.load_intrinsics_raw(target_drive, target_cam_id)
     intrinsics = self.scale_intrinsics(intrinsics, zoom_x, zoom_y)
-    example = {}
     example['intrinsics'] = intrinsics
     example['image_seq'] = image_seq
     example['folder_name'] = target_drive + '_' + target_cam_id + '/'
     example['file_name'] = target_frame_id
-    #print('image_seq type is ' + str(type(image_seq[0]))+ str(len(image_seq)))
-    example['mask_seq'] = gen_mask(image_seq)
     if self.load_pose:
       pose_seq = self.load_pose_sequence(frames, target_index)
       example['pose_seq'] = pose_seq
