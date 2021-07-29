@@ -45,7 +45,8 @@ gfile = tf.gfile
 FLAGS = flags.FLAGS
 
 DATASETS = [
-    'kitti_raw_eigen', 'kitti_raw_stereo', 'kitti_odom', 'cityscapes', 'bike'
+    'kitti_raw_eigen', 'kitti_raw_stereo', 'kitti_odom', 'cityscapes', 'bike',
+    'video'
 ]
 
 flags.DEFINE_enum('dataset_name', None, DATASETS, 'Dataset name.')
@@ -79,6 +80,13 @@ def _generate_data():
                                      img_height=FLAGS.img_height,
                                      img_width=FLAGS.img_width,
                                      seq_length=FLAGS.seq_length)
+  if FLAGS.dataset_name == 'video':
+    dataloader = dataset_loader.AnyVideo(FLAGS.dataset_dir,
+                                         img_height=FLAGS.img_height,
+                                         img_width=FLAGS.img_width,
+                                         seq_length=FLAGS.seq_length,
+                                         gen_mask=FLAGS.gen_mask)
+
   elif FLAGS.dataset_name == 'kitti_odom':
     dataloader = dataset_loader.KittiOdom(FLAGS.dataset_dir,
                                           img_height=FLAGS.img_height,
