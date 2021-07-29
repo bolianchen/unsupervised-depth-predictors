@@ -64,10 +64,11 @@ KITTI_raw/
 **struct2depth**:
 
 ```
-$python train.py --logtostderr \
-                 --checkpoint_dir ../test_struct2depth \
-                 --data_dir ../KITTI_processed/ \
-                 --architecture resnet
+$python struct2depth/train.py --logtostderr \
+                              --checkpoint_dir ../test_struct2depth \
+                              --data_dir ./KITTI_processed \
+                              --architecture resnet \
+                              --imagenet_ckpt ./Imagenet_ckpt/model.ckpt
 ```
 - vid2depth:
 ```
