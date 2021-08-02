@@ -12,7 +12,7 @@ mini_version="2011_09_26_calib.zip
 2011_09_30_calib.zip
 2011_09_30_drive_0016
 2011_10_03_calib.zip
-2011_10_03_drive_0027)"
+2011_10_03_drive_0027"
 
 full_version="2011_09_26_calib.zip
 2011_09_26_drive_0001
