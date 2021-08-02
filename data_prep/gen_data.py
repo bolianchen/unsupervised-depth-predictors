@@ -21,7 +21,7 @@
 #   --alsologtostderr \
 #   --dataset_name kitti_raw_eigen \
 #   --dataset_dir ~/vid2depth/dataset/kitti-raw-uncompressed \
-#   --data_dir ~/vid2depth/data/kitti_raw_eigen_s3 \
+#   --save_dir ~/vid2depth/data/kitti_raw_eigen_s3 \
 #   --seq_length 3 \
 #   --num_threads 12
 
@@ -44,54 +44,42 @@ import tensorflow as tf
 gfile = tf.gfile
 FLAGS = flags.FLAGS
 
-DATASETS = [
-    'kitti_raw_eigen', 'kitti_raw_stereo', 'kitti_odom', 'cityscapes', 'bike',
-    'video'
-]
+DATASETS = ['video', 'kitti_raw_eigen', 'kitti_raw_stereo']
 
 flags.DEFINE_enum('dataset_name', None, DATASETS, 'Dataset name.')
 flags.DEFINE_string('dataset_dir', None, 'Location for dataset source files.')
-flags.DEFINE_string('data_dir', None, 'Where to save the generated data.')
+flags.DEFINE_string('save_dir', None, 'Where to save the generated data.')
 flags.DEFINE_string('save_img_ext', 'png', 'image format to save')
 # Note: Training time grows linearly with sequence length.  Use 2 or 3.
 flags.DEFINE_integer('seq_length', 3, 'Length of each training sequence.')
 flags.DEFINE_integer('img_height', 128, 'Image height.')
 flags.DEFINE_integer('img_width', 416, 'Image width.')
+flags.DEFINE_integer('fps', 416, 'frames per second to sample from videos.')
 flags.DEFINE_integer(
     'num_threads', None, 'Number of worker threads. '
     'Defaults to number of CPU cores.')
 flags.DEFINE_string('gen_mask', None, 'Where to save the generated data.')
 flags.mark_flag_as_required('dataset_name')
 flags.mark_flag_as_required('dataset_dir')
-flags.mark_flag_as_required('data_dir')
+flags.mark_flag_as_required('save_dir')
 
 # Process data in chunks for reporting progress.
 NUM_CHUNKS = 100
 
-
 def _generate_data():
-  """Extract sequences from dataset_dir and store them in data_dir."""
-  if not gfile.Exists(FLAGS.data_dir):
-    gfile.MakeDirs(FLAGS.data_dir)
+  """Extract sequences from dataset_dir and store them in save_dir."""
+  if not gfile.Exists(FLAGS.save_dir):
+    gfile.MakeDirs(FLAGS.save_dir)
 
   global dataloader  # pylint: disable=global-variable-undefined
-  if FLAGS.dataset_name == 'bike':
-    dataloader = dataset_loader.Bike(FLAGS.dataset_dir,
-                                     img_height=FLAGS.img_height,
-                                     img_width=FLAGS.img_width,
-                                     seq_length=FLAGS.seq_length)
   if FLAGS.dataset_name == 'video':
-    dataloader = dataset_loader.AnyVideo(FLAGS.dataset_dir,
-                                         img_height=FLAGS.img_height,
-                                         img_width=FLAGS.img_width,
-                                         seq_length=FLAGS.seq_length,
-                                         gen_mask=FLAGS.gen_mask)
+    dataloader = dataset_loader.Video(FLAGS.dataset_dir,
+                                      img_height=FLAGS.img_height,
+                                      img_width=FLAGS.img_width,
+                                      seq_length=FLAGS.seq_length,
+                                      fps=FLAGS.fps,
+                                      gen_mask=FLAGS.gen_mask)
 
-  elif FLAGS.dataset_name == 'kitti_odom':
-    dataloader = dataset_loader.KittiOdom(FLAGS.dataset_dir,
-                                          img_height=FLAGS.img_height,
-                                          img_width=FLAGS.img_width,
-                                          seq_length=FLAGS.seq_length)
   elif FLAGS.dataset_name == 'kitti_raw_eigen':
     dataloader = dataset_loader.KittiRaw(FLAGS.dataset_dir,
                                          split='eigen',
@@ -104,12 +92,8 @@ def _generate_data():
                                          split='stereo',
                                          img_height=FLAGS.img_height,
                                          img_width=FLAGS.img_width,
-                                         seq_length=FLAGS.seq_length)
-  elif FLAGS.dataset_name == 'cityscapes':
-    dataloader = dataset_loader.Cityscapes(FLAGS.dataset_dir,
-                                           img_height=FLAGS.img_height,
-                                           img_width=FLAGS.img_width,
-                                           seq_length=FLAGS.seq_length)
+                                         seq_length=FLAGS.seq_length,
+                                         gen_mask=FLAGS.gen_mask)
   else:
     raise ValueError('Unknown dataset')
 
@@ -129,11 +113,11 @@ def _generate_data():
   if FLAGS.gen_mask:
       all_examples ={}
 
-      if not gfile.Exists(FLAGS.data_dir):
-        gfile.MakeDirs(FLAGS.data_dir)
+      if not gfile.Exists(FLAGS.save_dir):
+        gfile.MakeDirs(FLAGS.save_dir)
 
-      with gfile.Open(os.path.join(FLAGS.data_dir, 'train.txt'), 'w') as train_f:
-        with gfile.Open(os.path.join(FLAGS.data_dir, 'val.txt'), 'w') as val_f:
+      with gfile.Open(os.path.join(FLAGS.save_dir, 'train.txt'), 'w') as train_f:
+        with gfile.Open(os.path.join(FLAGS.save_dir, 'val.txt'), 'w') as val_f:
           logging.info('Generating data...')
           for frame in all_frames:
             # actually generating images and masks
@@ -157,11 +141,11 @@ def _generate_data():
       pool = multiprocessing.Pool(num_threads)
 
 
-      if not gfile.Exists(FLAGS.data_dir):
-        gfile.MakeDirs(FLAGS.data_dir)
+      if not gfile.Exists(FLAGS.save_dir):
+        gfile.MakeDirs(FLAGS.save_dir)
 
-      with gfile.Open(os.path.join(FLAGS.data_dir, 'train.txt'), 'w') as train_f:
-        with gfile.Open(os.path.join(FLAGS.data_dir, 'val.txt'), 'w') as val_f:
+      with gfile.Open(os.path.join(FLAGS.save_dir, 'train.txt'), 'w') as train_f:
+        with gfile.Open(os.path.join(FLAGS.save_dir, 'val.txt'), 'w') as val_f:
           logging.info('Generating data...')
           for index, frame_chunk in enumerate(frame_chunks):
             all_examples.clear()
@@ -193,7 +177,7 @@ def _gen_example(i, all_examples):
   fy = intrinsics[1, 1]
   cx = intrinsics[0, 2]
   cy = intrinsics[1, 2]
-  save_dir = os.path.join(FLAGS.data_dir, example['folder_name'])
+  save_dir = os.path.join(FLAGS.save_dir, example['folder_name'])
   if not gfile.Exists(save_dir):
     gfile.MakeDirs(save_dir)
   img_filepath = os.path.join(save_dir, f'{example["file_name"]}.{FLAGS.save_img_ext}')

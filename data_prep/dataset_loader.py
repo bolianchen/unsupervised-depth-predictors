@@ -14,7 +14,6 @@
 # ==============================================================================
 
 """Classes to load KITTI and Cityscapes data."""
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -161,10 +160,12 @@ class KittiRaw(object):
     num_frames = len(frames)
     target_drive, cam_id, _ = frames[target_index].split(' ')
     start_index, end_index = get_seq_start_end(target_index, self.seq_length)
+    # check if the indices of the start and end are out of the range
     if start_index < 0 or end_index >= num_frames:
       return False
     start_drive, start_cam_id, _ = frames[start_index].split(' ')
     end_drive, end_cam_id, _ = frames[end_index].split(' ')
+    # check if the scenes and cam_ids are the same 
     if (target_drive == start_drive and target_drive == end_drive and
         cam_id == start_cam_id and cam_id == end_cam_id):
       return True
@@ -417,284 +418,7 @@ class Bike(object):
 
 
 
-class KittiOdom(object):
-  """Reads KITTI odometry data files."""
-
-  def __init__(self, dataset_dir, img_height=128, img_width=416, seq_length=3):
-    self.dataset_dir = dataset_dir
-    self.img_height = img_height
-    self.img_width = img_width
-    self.seq_length = seq_length
-    self.train_seqs = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-    self.test_seqs = [9, 10]
-
-    self.collect_test_frames()
-    self.collect_train_frames()
-
-  def collect_test_frames(self):
-    self.test_frames = []
-    for seq in self.test_seqs:
-      seq_dir = os.path.join(self.dataset_dir, 'sequences', '%.2d' % seq)
-      img_dir = os.path.join(seq_dir, 'image_2')
-      num_frames = len(glob.glob(os.path.join(img_dir, '*.png')))
-      for n in range(num_frames):
-        self.test_frames.append('%.2d %.6d' % (seq, n))
-    self.num_test = len(self.test_frames)
-
-  def collect_train_frames(self):
-    self.train_frames = []
-    for seq in self.train_seqs:
-      seq_dir = os.path.join(self.dataset_dir, 'sequences', '%.2d' % seq)
-      img_dir = os.path.join(seq_dir, 'image_2')
-      num_frames = len(glob.glob(img_dir + '/*.png'))
-      for n in range(num_frames):
-        self.train_frames.append('%.2d %.6d' % (seq, n))
-    self.num_train = len(self.train_frames)
-
-  def is_valid_sample(self, frames, target_frame_index):
-    """Checks whether we can find a valid sequence around this frame."""
-    num_frames = len(frames)
-    target_frame_drive, _ = frames[target_frame_index].split(' ')
-    start_index, end_index = get_seq_start_end(target_frame_index,
-                                               self.seq_length)
-    if start_index < 0 or end_index >= num_frames:
-      return False
-    start_drive, _ = frames[start_index].split(' ')
-    end_drive, _ = frames[end_index].split(' ')
-    if target_frame_drive == start_drive and target_frame_drive == end_drive:
-      return True
-    return False
-
-  def load_image_sequence(self, frames, target_frame_index):
-    """Returns a sequence with requested target frame."""
-    start_index, end_index = get_seq_start_end(target_frame_index,
-                                               self.seq_length)
-    image_seq = []
-    for index in range(start_index, end_index + 1):
-      drive, frame_id = frames[index].split(' ')
-      img = self.load_image(drive, frame_id)
-      if index == target_frame_index:
-        zoom_y = self.img_height / img.shape[0]
-        zoom_x = self.img_width / img.shape[1]
-      # notice the default mode for RGB images is BICUBIC
-      img = np.array(Image.fromarray(img).resize((self.img_width, self.img_height)))
-      image_seq.append(img)
-    return image_seq, zoom_x, zoom_y
-
-  def load_example(self, frames, target_frame_index):
-    """Returns a sequence with requested target frame."""
-    image_seq, zoom_x, zoom_y = self.load_image_sequence(frames,
-                                                         target_frame_index)
-    target_frame_drive, target_frame_id = frames[target_frame_index].split(' ')
-    intrinsics = self.load_intrinsics(target_frame_drive, target_frame_id)
-    intrinsics = self.scale_intrinsics(intrinsics, zoom_x, zoom_y)
-    example = {}
-    example['intrinsics'] = intrinsics
-    example['image_seq'] = image_seq
-    example['folder_name'] = target_frame_drive
-    example['file_name'] = target_frame_id
-    return example
-
-  def get_example_with_index(self, target_frame_index):
-    if not self.is_valid_sample(self.train_frames, target_frame_index):
-      return False
-    example = self.load_example(self.train_frames, target_frame_index)
-    return example
-
-  def load_image(self, drive, frame_id):
-    img_file = os.path.join(self.dataset_dir, 'sequences',
-                            '%s/image_2/%s.png' % (drive, frame_id))
-    img = imageio.imread(img_file)
-    return img
-
-  def load_intrinsics(self, drive, unused_frame_id):
-    calib_file = os.path.join(self.dataset_dir, 'sequences',
-                              '%s/calib.txt' % drive)
-    proj_c2p, _ = self.read_calib_file(calib_file)
-    intrinsics = proj_c2p[:3, :3]
-    return intrinsics
-
-  def read_calib_file(self, filepath, cam_id=2):
-    """Read in a calibration file and parse into a dictionary."""
-
-    def parse_line(line, shape):
-      data = line.split()
-      data = np.array(data[1:]).reshape(shape).astype(np.float32)
-      return data
-
-    with open(filepath, 'r') as f:
-      mat = f.readlines()
-    proj_c2p = parse_line(mat[cam_id], shape=(3, 4))
-    proj_v2c = parse_line(mat[-1], shape=(3, 4))
-    filler = np.array([0, 0, 0, 1]).reshape((1, 4))
-    proj_v2c = np.concatenate((proj_v2c, filler), axis=0)
-    return proj_c2p, proj_v2c
-
-  def scale_intrinsics(self, mat, sx, sy):
-    out = np.copy(mat)
-    out[0, 0] *= sx
-    out[0, 2] *= sx
-    out[1, 1] *= sy
-    out[1, 2] *= sy
-    return out
-
-
-class Cityscapes(object):
-  """Reads Cityscapes data files."""
-
-  def __init__(self,
-               dataset_dir,
-               split='train',
-               crop_bottom=CITYSCAPES_CROP_BOTTOM,  # Crop the car logo.
-               crop_pct=CITYSCAPES_CROP_PCT,
-               sample_every=CITYSCAPES_SAMPLE_EVERY,
-               img_height=128,
-               img_width=416,
-               seq_length=3):
-    self.dataset_dir = dataset_dir
-    self.split = split
-    self.crop_bottom = crop_bottom
-    self.crop_pct = crop_pct
-    self.sample_every = sample_every
-    self.img_height = img_height
-    self.img_width = img_width
-    self.seq_length = seq_length
-    self.frames = self.collect_frames(split)
-    self.num_frames = len(self.frames)
-    if split == 'train':
-      self.num_train = self.num_frames
-    else:
-      self.num_test = self.num_frames
-    logging.info('Total frames collected: %d', self.num_frames)
-
-  def collect_frames(self, split):
-    img_dir = os.path.join(self.dataset_dir, 'leftImg8bit_sequence', split)
-    city_list = os.listdir(img_dir)
-    frames = []
-    for city in city_list:
-      img_files = glob.glob(os.path.join(img_dir, city, '*.png'))
-      for f in img_files:
-        frame_id = os.path.basename(f).split('leftImg8bit')[0]
-        frames.append(frame_id)
-    return frames
-
-  def get_example_with_index(self, target_index):
-    target_frame_id = self.frames[target_index]
-    if not self.is_valid_example(target_frame_id):
-      return False
-    example = self.load_example(self.frames[target_index])
-    return example
-
-  def load_intrinsics(self, frame_id, split):
-    """Read intrinsics data for frame."""
-    city, seq, _, _ = frame_id.split('_')
-    camera_file = os.path.join(self.dataset_dir, 'camera', split, city,
-                               city + '_' + seq + '_*_camera.json')
-    camera_file = glob.glob(camera_file)[0]
-    with open(camera_file, 'r') as f:
-      camera = json.load(f)
-    fx = camera['intrinsic']['fx']
-    fy = camera['intrinsic']['fy']
-    u0 = camera['intrinsic']['u0']
-    v0 = camera['intrinsic']['v0']
-    # Cropping the bottom of the image and then resizing it to the same
-    # (height, width) amounts to stretching the image's height.
-    if self.crop_bottom:
-      fy *= 1.0 / self.crop_pct
-    intrinsics = np.array([[fx, 0, u0],
-                           [0, fy, v0],
-                           [0, 0, 1]])
-    return intrinsics
-
-  def is_valid_example(self, target_frame_id):
-    """Checks whether we can find a valid sequence around this frame."""
-    city, snippet_id, target_local_frame_id, _ = target_frame_id.split('_')
-    start_index, end_index = get_seq_start_end(
-        int(target_local_frame_id), self.seq_length, self.sample_every)
-    for index in range(start_index, end_index + 1, self.sample_every):
-      local_frame_id = '%.6d' % index
-      frame_id = '%s_%s_%s_' % (city, snippet_id, local_frame_id)
-      image_filepath = os.path.join(self.dataset_dir, 'leftImg8bit_sequence',
-                                    self.split, city,
-                                    frame_id + 'leftImg8bit.png')
-      if not os.path.exists(image_filepath):
-        return False
-    return True
-
-  def load_image_sequence(self, target_frame_id):
-    """Returns a sequence with requested target frame."""
-    city, snippet_id, target_local_frame_id, _ = target_frame_id.split('_')
-    start_index, end_index = get_seq_start_end(
-        int(target_local_frame_id), self.seq_length, self.sample_every)
-    image_seq = []
-    for index in range(start_index, end_index + 1, self.sample_every):
-      local_frame_id = '%.6d' % index
-      frame_id = '%s_%s_%s_' % (city, snippet_id, local_frame_id)
-      image_filepath = os.path.join(self.dataset_dir, 'leftImg8bit_sequence',
-                                    self.split, city,
-                                    frame_id + 'leftImg8bit.png')
-      img = imageio.imread(image_filepath)
-      if self.crop_bottom:
-        ymax = int(img.shape[0] * self.crop_pct)
-        img = img[:ymax]
-      raw_shape = img.shape
-      if index == int(target_local_frame_id):
-        zoom_y = self.img_height / raw_shape[0]
-        zoom_x = self.img_width / raw_shape[1]
-      # notice the default mode for RGB images is BICUBIC
-      img = np.array(Image.fromarray(img).resize((self.img_width, self.img_height)))
-      image_seq.append(img)
-    return image_seq, zoom_x, zoom_y
-
-  def load_example(self, target_frame_id):
-    """Returns a sequence with requested target frame."""
-    image_seq, zoom_x, zoom_y = self.load_image_sequence(target_frame_id)
-    intrinsics = self.load_intrinsics(target_frame_id, self.split)
-    intrinsics = self.scale_intrinsics(intrinsics, zoom_x, zoom_y)
-    example = {}
-    example['intrinsics'] = intrinsics
-    example['image_seq'] = image_seq
-    example['folder_name'] = target_frame_id.split('_')[0]
-    example['file_name'] = target_frame_id[:-1]
-    return example
-
-  def scale_intrinsics(self, mat, sx, sy):
-    out = np.copy(mat)
-    out[0, 0] *= sx
-    out[0, 2] *= sx
-    out[1, 1] *= sy
-    out[1, 2] *= sy
-    return out
-
-
-def get_resource_path(relative_path):
-  return relative_path
-
-
-def get_seq_start_end(target_index, seq_length, sample_every=1):
-  """Returns absolute seq start and end indices for a given target frame."""
-  half_offset = int((seq_length - 1) / 2) * sample_every
-  end_index = target_index + half_offset
-  start_index = end_index - (seq_length - 1) * sample_every
-  return start_index, end_index
-
-
-def atoi(text):
-  return int(text) if text.isdigit() else text
-
-
-def natural_keys(text):
-  return [atoi(c) for c in re.split(r'(\d+)', text)]
-
-
-def atoi(text):
-  return int(text) if text.isdigit() else text
-
-def natural_keys(text):
-  return [atoi(c) for c in re.split(r'(\d+)', text)]
-
-
-class AnyVideo(object):
+class Video(object):
   """Load bike video frames."""
 
   def __init__(self,
@@ -703,6 +427,7 @@ class AnyVideo(object):
                img_width=416,
                seq_length=3,
                sample_every=1,
+               fps=10,
                gen_mask=False):
     self.dataset_dir = dataset_dir
     self.img_height = img_height
@@ -710,6 +435,7 @@ class AnyVideo(object):
     self.seq_length = seq_length
     self.gen_mask = gen_mask
     self.sample_every = sample_every
+    self.fps = fps
     self.video_files = self.collect_videos()
     self.videos2images()
     self.frames = self.collect_frames()
@@ -753,8 +479,8 @@ class AnyVideo(object):
       return video_files
 
   def videos2images(self):
-      vid2img(self.video_files, self.dataset_dir, target_h=self.img_height,
-              target_w=self.img_width)
+      vid2img(self.video_files, self.dataset_dir, fps=self.fps,
+              target_h=self.img_height, target_w=self.img_width, )
 
   def collect_frames(self):
     """Create a list of unique ids for available frames."""
@@ -898,7 +624,7 @@ def atoi(text):
 def natural_keys(text):
   return [atoi(c) for c in re.split(r'(\d+)', text)]
 
-def vid2img(video_files, save_dir, fps=10, crop=True, crop_h1=0, crop_h2=720,
+def vid2img(video_files, save_dir, fps=5, crop=True, crop_h1=0, crop_h2=720,
             crop_w1=0, crop_w2=1280, resize=False, target_h=128, target_w=416,
             shift_h=0.15, shift_w=0.0, img_ext='.jpg'):
 
