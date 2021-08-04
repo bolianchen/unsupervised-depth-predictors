@@ -36,6 +36,7 @@ from absl import app
 from absl import flags
 from absl import logging
 import dataset_loader
+import custom_dataloader
 import numpy as np
 import scipy.misc
 import imageio
@@ -54,7 +55,7 @@ flags.DEFINE_string('save_img_ext', 'png', 'image format to save')
 flags.DEFINE_integer('seq_length', 3, 'Length of each training sequence.')
 flags.DEFINE_integer('img_height', 128, 'Image height.')
 flags.DEFINE_integer('img_width', 416, 'Image width.')
-flags.DEFINE_integer('fps', 416, 'frames per second to sample from videos.')
+flags.DEFINE_integer('fps', 10, 'frames per second to sample from videos.')
 flags.DEFINE_integer(
     'num_threads', None, 'Number of worker threads. '
     'Defaults to number of CPU cores.')
@@ -73,12 +74,12 @@ def _generate_data():
 
   global dataloader  # pylint: disable=global-variable-undefined
   if FLAGS.dataset_name == 'video':
-    dataloader = dataset_loader.Video(FLAGS.dataset_dir,
-                                      img_height=FLAGS.img_height,
-                                      img_width=FLAGS.img_width,
-                                      seq_length=FLAGS.seq_length,
-                                      fps=FLAGS.fps,
-                                      gen_mask=FLAGS.gen_mask)
+    dataloader = custom_dataloader.Video(FLAGS.dataset_dir,
+                                         img_height=FLAGS.img_height,
+                                         img_width=FLAGS.img_width,
+                                         seq_length=FLAGS.seq_length,
+                                         fps=FLAGS.fps,
+                                         gen_mask=FLAGS.gen_mask)
 
   elif FLAGS.dataset_name == 'kitti_raw_eigen':
     dataloader = dataset_loader.KittiRaw(FLAGS.dataset_dir,
@@ -140,7 +141,6 @@ def _generate_data():
       num_threads = num_cores if FLAGS.num_threads is None else FLAGS.num_threads
       pool = multiprocessing.Pool(num_threads)
 
-
       if not gfile.Exists(FLAGS.save_dir):
         gfile.MakeDirs(FLAGS.save_dir)
 
@@ -163,8 +163,11 @@ def _generate_data():
                   train_f.write('%s %s\n' % (s, frame))
       pool.close()
       pool.join()
-
-
+  if FLAGS.dataset_name='video':
+      dataloader.delete_temp_images()
+  
+  
+  
 def _gen_example(i, all_examples):
   """Saves one example to file.  Also adds it to all_examples dict."""
   example = dataloader.get_example_with_index(i)
