@@ -57,7 +57,14 @@ def inverse_warp(img, depth, egomotion_mat, intrinsic_mat,
   intrinsic_mat_hom = tf.concat(
       [intrinsic_mat, tf.zeros([batch_size, 3, 1])], axis=2)
   intrinsic_mat_hom = tf.concat([intrinsic_mat_hom, hom_filler], axis=1)
+
+  intrinsic_mat_hom = tf.cast(intrinsic_mat_hom, tf.float64)
+  egmotion_mat = tf.cast(egomotion_mat, tf.float64)
+
   proj_target_cam_to_source_pixel = tf.matmul(intrinsic_mat_hom, egomotion_mat)
+  
+  proj_target_cam_to_source_pixel = tf.cast(proj_target_cam_to_source_pixel, tf.float32) 
+
   source_pixel_coords = _cam2pixel(cam_coords_hom,
                                    proj_target_cam_to_source_pixel)
   source_pixel_coords = tf.reshape(source_pixel_coords,
@@ -82,20 +89,36 @@ def get_transform_mat(egomotion_vecs, i, j):
 
   # Multiply all matrices.
   egomotion_mat = egomotion_transforms[0]
+  egomotion_mat = tf.cast(egomotion_mat, tf.float64)
   for i in range(1, len(egomotion_transforms)):
-    egomotion_mat = tf.matmul(egomotion_mat, egomotion_transforms[i])
+    egomotion_mat = tf.matmul(
+            egomotion_mat,
+            tf.cast(egomotion_transforms[i], tf.float64)
+            )
+  egomotion_mat = tf.cast(egomotion_mat, tf.float32)
   return egomotion_mat
 
 
 def _pixel2cam(depth, pixel_coords, intrinsic_mat_inv):
   """Transform coordinates in the pixel frame to the camera frame."""
+  intrinsic_mat_inv = tf.cast(intrinsic_mat_inv, tf.float64)
+  pixel_coords = tf.cast(pixel_coords, tf.float64)
+  depth = tf.cast(depth, tf.float64)
   cam_coords = tf.matmul(intrinsic_mat_inv, pixel_coords) * depth
+
+  cam_coords = tf.cast(cam_coords, tf.float32)
   return cam_coords
 
 
 def _cam2pixel(cam_coords, proj_c2p):
   """Transform coordinates in the camera frame to the pixel frame."""
+  proj_c2p = tf.cast(proj_c2p, tf.float64)
+  cam_coords = tf.cast(cam_coords, tf.float64)
+
   pcoords = tf.matmul(proj_c2p, cam_coords)
+
+  pcoords = tf.cast(pcoords, tf.float32)
+
   x = tf.slice(pcoords, [0, 0, 0], [-1, 1, -1])
   y = tf.slice(pcoords, [0, 1, 0], [-1, 1, -1])
   z = tf.slice(pcoords, [0, 2, 0], [-1, 1, -1])
@@ -109,11 +132,19 @@ def _cam2pixel(cam_coords, proj_c2p):
 def _meshgrid_abs(height, width):
   """Meshgrid in the absolute coordinates."""
   x_t = tf.matmul(
-      tf.ones(shape=tf.stack([height, 1])),
-      tf.transpose(tf.expand_dims(tf.linspace(-1.0, 1.0, width), 1), [1, 0]))
+      tf.cast(tf.ones(shape=tf.stack([height, 1])), tf.float64),
+      tf.cast(
+          tf.transpose(tf.expand_dims(tf.linspace(-1.0, 1.0, width), 1), [1, 0]),
+          tf.float64)
+      )
   y_t = tf.matmul(
-      tf.expand_dims(tf.linspace(-1.0, 1.0, height), 1),
-      tf.ones(shape=tf.stack([1, width])))
+      tf.cast(tf.expand_dims(tf.linspace(-1.0, 1.0, height), 1), tf.float64),
+      tf.cast(tf.ones(shape=tf.stack([1, width])), tf.float64)
+      )
+
+  x_t = tf.cast(x_t, tf.float32)
+  y_t = tf.cast(y_t, tf.float32)
+
   x_t = (x_t + 1.0) * 0.5 * tf.cast(width - 1, tf.float32)
   y_t = (y_t + 1.0) * 0.5 * tf.cast(height - 1, tf.float32)
   x_t_flat = tf.reshape(x_t, (1, -1))
@@ -175,7 +206,14 @@ def _euler2mat(z, y, x):
   rotx_3 = tf.concat([zeros, sinx, cosx], axis=3)
   xmat = tf.concat([rotx_1, rotx_2, rotx_3], axis=2)
 
-  return tf.matmul(tf.matmul(xmat, ymat), zmat)
+  xmat = tf.cast(xmat, tf.float64)
+  ymat = tf.cast(ymat, tf.float64)
+  zmat = tf.cast(zmat, tf.float64)
+
+  result = tf.matmul(tf.matmul(xmat, ymat), zmat)
+  result = tf.cast(result, tf.float32)
+
+  return result
 
 
 def _egomotion_vec2mat(vec, batch_size):
