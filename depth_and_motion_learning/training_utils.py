@@ -47,6 +47,8 @@ flags.DEFINE_string('master', '', 'TensorFlow session address.')
 
 flags.DEFINE_string('model_dir', '', 'Directory where the model is saved.')
 
+flags.DEFINE_integer('epochs', 20, 'how many iterations over the dataset to run')
+
 flags.DEFINE_string('param_overrides', '', 'Parameters for the trainer and the '
                     'model')
 
@@ -83,7 +85,6 @@ TRAINER_PARAMS = {
     # The default value of 10,000 hours effectively disables the feature.
     'keep_checkpoint_every_n_hours': 10000,
 }
-
 
 class InitFromCheckpointHook(tf.estimator.SessionRunHook):
   """A hook for initializing training from a checkpoint.
@@ -288,6 +289,13 @@ def train(input_fn, loss_fn, get_vars_to_restore_fn=None):
   }})
 
   params.override(FLAGS.param_overrides)
+
+  # calculate max_steps according to the specified epochs
+  num_training_data = sum(1 for line in open(params.model.input.data_path))
+  steps_per_epoch = num_training_data//params.model.batch_size
+  params.override({'trainer': {'max_steps': FLAGS.epochs * steps_per_epoch}})
+
+  print(f'{params.trainer.max_steps} steps in total to run for {FLAGS.epochs} epochs')
 
   init_ckpt_type = params.trainer.get('init_ckpt_type')
 
