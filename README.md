@@ -27,6 +27,7 @@ We are developing an algorithm prototype to estimate depth for advanced driver-a
 - codes: [google-research/google-research, commit 57b6017](https://github.com/google-research/google-research/tree/57b60e7a7a5efc358adf4041a062ae435e6155be)
 
 </p>
+
 </details>
     
 <details><summary><strong>depth_and_motion_learning</strong></summary>
@@ -45,9 +46,9 @@ Segmentation masks of the training images are generated based on [**matterport/M
 The codes are tested with tensorflow 1.15 and its official binaries are built with cuda10.0 that might be inconsistent with yours. Using conda environments is likely to prevent you from suffering.
     
 ```
-conda create -n your_virtual_env_name python=3.6
-conda install -c anaconda cudatoolkit=10.0 cudnn=7.6.5
-pip install -r requirements.txt
+$ conda create -n your_virtual_env_name python=3.6
+$ conda install -c anaconda cudatoolkit=10.0 cudnn=7.6.5
+$ pip install -r requirements.txt
 ```
 
 ## Data Preparation
@@ -75,13 +76,14 @@ Imagenet_ckpt/
 <details><summary><strong>KITTI Data</strong></summary>
 <p>
 
-#### Download Raw Data
+### Download Raw Data
 
+Three versions of KITTI data, `tiny_version`, `mini_version` and `full_version`, could be chosen by passing an argument to the downloading script. The former two, respectively, consist of a single data split from one date and from all of the five dates.
 ```bash
 $ version=full_version  # choose among (tiny_version, mini_version, full_version)
 $ ./kitti_raw_downloader.sh $version
 ```
-
+The downloaded files will be automatically decompressed to `KITTI_raw` folder. The structure of `mini_version` is shown as follows: 
 ```
 KITTI_raw/
 └── 2011_09_26
@@ -96,6 +98,12 @@ KITTI_raw/
     ├── calib_imu_to_velo.txt
     └── calib_velo_to_cam.txt
 ```
+
+### Convert Raw to Training Data
+
+```
+$ python 
+```
     
 </p>
 </details>
@@ -109,29 +117,45 @@ KITTI_raw/
 
 
 
-## Model Training
-#### struct2depth:
+## Training
+    
+<details><summary><strong>struct2depth</strong></summary>
+<p>
 
 ```
-$python struct2depth/train.py --logtostderr \
-                              --checkpoint_dir ../test_struct2depth \
-                              --data_dir ./KITTI_processed \
-                              --architecture resnet \
-                              --imagenet_ckpt ./Imagenet_ckpt/model.ckpt
-                              --epochs 20
+$ python struct2depth/train.py --logtostderr \
+                               --checkpoint_dir ../test_struct2depth \
+                               --data_dir ./KITTI_processed \
+                               --architecture resnet \
+                               --imagenet_ckpt ./Imagenet_ckpt/model.ckpt
+                               --epochs 20
 ```
-#### vid2depth:
-```
-$
-```
-- depth_from_video_in_the_wild:
+
+</p>
+</details>
+
+<details><summary><strong>vid2depth(under development)</strong></summary>
+<p>
+
+</p>
+</details>
+
+<details><summary><strong>depth_from_video_in_the_wild</strong></summary>
+<p>
+
 ```
 $ python -m depth_from_video_in_the_wild.train --checkpoint_dir=$MY_CHECKPOINT_DIR \
                                                --data_dir=$MY_DATA_DIR \
                                                --imagenet_ckpt=$MY_IMAGENET_CHECKPOINT
 ```
+    
 
-#### depth_and_motion_learning:
+</p>
+</details>
+
+<details><summary><strong>depth_and_motion_learning</strong></summary>
+<p>
+
 ```
 $ python -m depth_and_motion_learning.depth_motion_field_train --model_dir=../test_motion \
                                                                --param_overrides='{
@@ -147,8 +171,8 @@ $ python -m depth_and_motion_learning.depth_motion_field_train --model_dir=../te
                                                                }'
 ```
 
-## Inference
-#### struct2depth:
-```
+</p>
+</details>
 
-```
+## Inference
+
