@@ -134,7 +134,7 @@ $ python struct2depth/train.py --logtostderr \
 </p>
 </details>
 
-<details><summary><strong>vid2depth(under development)</strong></summary>
+<details><summary><strong>vid2depth (under development)</strong></summary>
 <p>
 
 </p>
