@@ -43,7 +43,7 @@ Segmentation masks of the training images are generated based on [**matterport/M
 
 ## Environment Setup
 
-The codes are tested with tensorflow 1.15 and its official binaries are built with cuda10.0 that might be inconsistent with yours. Using conda environments is likely to prevent you from suffering.
+The codes are tested with tensorflow 1.15 and its official binaries are built with cuda10.0 that might be inconsistent with yours. Using conda environments would prevent the sufferings.
     
 ```
 $ conda create -n your_virtual_env_name python=3.6
