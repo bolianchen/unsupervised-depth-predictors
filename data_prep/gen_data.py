@@ -51,12 +51,12 @@ flags.DEFINE_bool(
         'cut', False, 'if necessary to cut h720 x w1280 '
         'during the video to image conversion')
 CROPPING = ['multi_crops', 'shift_h']
-flags.DEFINE_enum('crop', None, CROPPING,'how to crop the images')
+flags.DEFINE_enum('crop', 'multi_crops', CROPPING,'how to crop the images')
 flags.DEFINE_float('shift_h', 0.1, 'the ratio representing the starting '
                      'point from the top to crop img_height')
 # TODO add demo to interactive adjust shift_h
 flags.DEFINE_integer('fps', 10, 'frames per second to sample from videos.')
-flags.DEFINE_bool( 'delete_temp', False, 'delete temporary converted images '
+flags.DEFINE_bool( 'delete_temp', True, 'delete temporary converted images '
                    'from videos')
 
 flags.DEFINE_integer(
@@ -66,7 +66,6 @@ flags.DEFINE_bool('gen_mask', False, 'Where to save the generated data.')
 flags.mark_flag_as_required('dataset_name')
 flags.mark_flag_as_required('dataset_dir')
 flags.mark_flag_as_required('save_dir')
-flags.mark_flag_as_required('crop')
 
 # Process data in chunks for reporting progress.
 NUM_CHUNKS = 100
