@@ -1,4 +1,4 @@
-# Copyright 2017 The TensorFlow Authors All Rights Reserved.
+# Copyright All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Classes to load KITTI and Cityscapes data."""
+"""Classes to load your own videos"""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -42,13 +42,11 @@ from mrcnn import visualize
 # Import COCO config
 import coco
 
-
 class InferenceConfig(coco.CocoConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
-
 
 class Video(object):
   """ Make dataloader from any videos in a folder"""
@@ -59,17 +57,28 @@ class Video(object):
                img_width=416,
                seq_length=3,
                sample_every=1,
+               cut = False,
+               crop = 'multi_crops',
+               shift_h = 0.0,
                fps=10,
+               img_ext='png',
                gen_mask=False):
+
     self.dataset_dir = dataset_dir
     self.img_height = img_height
     self.img_width = img_width
     self.seq_length = seq_length
     self.gen_mask = gen_mask
     self.sample_every = sample_every
+    self.cut = cut
+    self.crop = crop
+    self.shift_h = shift_h
     self.fps = fps
-    self.video_files = self.collect_videos()
-    self.videos2images()
+    self.img_ext = img_ext
+    # TODO: check if converted images exist
+    self.videos = self.collect_videos()
+    self.vid2img()
+    self.video_dirs = self.collect_video_dirs()
     self.frames = self.collect_frames()
     self.num_frames = len(self.frames)
     self.num_train = self.num_frames
@@ -107,39 +116,118 @@ class Video(object):
     return mask_img
 
   def collect_videos(self):
-      video_files = glob.glob(os.path.join(self.dataset_dir, '*.mp4'))
-      return video_files
+      """ Collect absolute paths of the video files for conversion"""
 
-  def videos2images(self):
-      """ Convert videos to temporary images to be processed"""
+      videos = glob.glob(os.path.join(self.dataset_dir, '*.mp4'))
+      return videos
 
-      vid2img(self.video_files, self.dataset_dir, fps=self.fps,
-              target_h=self.img_height, target_w=self.img_width, )
+  def collect_video_dirs(self):
+      """ Return a list of names of all the video directories"""
 
-  def delete_temp_images(self):
-      for video in self.video_files:
-          temp_vfolder = video.split('.mp4')[0]
-          try:
-              shutil.rmtree(temp_vfolder)
-          except:
-              assert False, f'error occurred while deleting {temp_vfolder}'
+      # names of all the video directories
+      video_dirs = []
+
+      # iterate through all the file names
+      for item in os.listdir(self.dataset_dir):
+          # collect directories named with the videos' names
+          if os.path.isdir(os.path.join(self.dataset_dir, item)):
+              # only collect folder names
+              video_dirs.append(item)
+
+      return video_dirs
+
+  def vid2img(self):
+      """ Convert videos to images without rescaling """
+
+      fps = self.fps
+      save_dir = self.dataset_dir
+      img_ext = self.img_ext
+
+      for video in self.videos:
+          print(f'converting {video} into images')
+          vidcap = cv2.VideoCapture(video)
+            
+          # get the approximate frame rate 
+          raw_fps = vidcap.get(cv2.CAP_PROP_FPS)
+
+          if fps:
+              # original fps
+              assert raw_fps >= fps, "the specified fps is higher than the raw video"
+              # the period of saving images from the video
+              period = round(raw_fps/fps)
+          else:
+              # save every frame
+              period = 1
+
+            # the folder to save images of a specific root
+          path = os.path.join(
+                  save_dir,
+                  os.path.basename(video).split('.')[0]
+                  )
+          if not os.path.exists(path):
+              os.makedirs(path)
+
+          count = 0
+          while True:
+
+              success, image = vidcap.read()
+
+              # repeat if video reading has not started
+              if vidcap.get(cv2.CAP_PROP_POS_MSEC) == 0.0:
+                  success, image = vidcap.read()
+
+              if success:
+                  if count%period == 0:
+                      save_idx = count//period
+
+                      if self.cut:
+                          image = self._initial_crop(image)
+                      cv2.imwrite(
+                              os.path.join(
+                                  path, "{:010d}.{}".format(save_idx, img_ext)
+                                  ),
+                              image
+                              )
+
+                  if count%500 == 0:
+                      print(f'{count} raw frames have been processed')
+
+                  count+=1
+              else:
+                  break
+
+  def _initial_crop(self, img, crop_h=720, crop_w=1280):
+      """ Crop out H720 x W1280 of a image
+
+      This Function is to crop out a portion out of the input frame. 
+      Since there is not following adjustment of intrinsics, it should only be 
+      applied when the frame is composed of concatenation of images from 
+      different camera.
+      """
+
+      return img[:crop_h, :crop_w, :]
 
   def collect_frames(self):
     """Create a list of unique ids for available frames."""
 
-    video_list = []
-    for vdir in os.listdir(self.dataset_dir):
-        if os.path.isdir(os.path.join(self.dataset_dir, vdir)):
-            video_list.append(vdir)
-    logging.info('video_list: %s', video_list)
     frames = []
-    for video in video_list:
-      im_files = glob.glob(os.path.join(self.dataset_dir, video, '*.jpg'))
+    for video_dir in self.video_dirs:
+      # absolute paths
+      im_files = glob.glob(os.path.join(self.dataset_dir, video_dir, f'*.{self.img_ext}'))
+      # sort images in a video directory; this sorting works even 
+      # when the image indices are not formated to same digits
       im_files = sorted(im_files, key=natural_keys)
-      # Adding 3 crops of the video.
-      frames.extend(['A' + video + '/' + os.path.basename(f) for f in im_files])
-      frames.extend(['B' + video + '/' + os.path.basename(f) for f in im_files])
-      frames.extend(['C' + video + '/' + os.path.basename(f) for f in im_files])
+
+      if self.crop == 'multi_crops':
+          # Adding 3 crops of the video.
+          frames.extend(['A' + video_dir + '/' + os.path.basename(f) for f in im_files])
+          frames.extend(['B' + video_dir + '/' + os.path.basename(f) for f in im_files])
+          frames.extend(['C' + video_dir + '/' + os.path.basename(f) for f in im_files])
+      elif self.crop == 'shift_h':
+          frames.extend(['S' + video_dir + '/' + os.path.basename(f) for f in im_files])
+      else:
+          raise NotImplementedError(f'crop {self.crop} not supported')
+      
     return frames
 
   def get_example_with_index(self, target_index):
@@ -148,17 +236,6 @@ class Video(object):
     example = self.load_example(target_index)
     return example
 
-  def load_intrinsics(self, unused_frame_idx, crop_top):
-    """Load intrinsics."""
-    # https://www.wired.com/2013/05/calculating-the-angular-view-of-an-iphone/
-    # https://codeyarns.com/2015/09/08/how-to-compute-intrinsic-camera-matrix-for-a-camera/
-    # https://stackoverflow.com/questions/39992968/how-to-calculate-field-of-view-of-the-camera-from-camera-intrinsic-matrix
-    # # iPhone: These numbers are for images with resolution 720 x 1280.
-    # Assuming FOV = 50.9 => fx = (1280 // 2) / math.tan(fov / 2) = 1344.8
-    intrinsics = np.array([[1783.8784, 0.0, 309.5386],
-                           [0, 1776.7683, 311.0264-crop_top],
-                           [0, 0, 1.0]])
-    return intrinsics
 
   def is_valid_sample(self, target_index):
     """Checks whether we can find a valid sequence around this frame."""
@@ -176,27 +253,36 @@ class Video(object):
 
   def load_image_raw(self, frame_id):
     """Reads the image and crops it according to first letter of frame_id."""
+
     crop_type = frame_id[0]
     img_file = os.path.join(self.dataset_dir, frame_id[1:])
     img = imageio.imread(img_file)
+
+    # image shape (H, W, C)
+    # assume H would be crop
     allowed_height = int(img.shape[1] * self.img_height / self.img_width)
+
     # Starting height for the middle crop.
     mid_crop_top = int(img.shape[0] / 2 - allowed_height / 2)
     # How much to go up or down to get the other two crops.
+    # hard coded as one-third of the top cropping
+    # crop_top will be used to adjust the princial point y in the intrinsics
+    # due to the cropping
     height_var = int(mid_crop_top / 3)
     if crop_type == 'A':
       crop_top = mid_crop_top - height_var
-      cy = allowed_height / 2 + height_var
     elif crop_type == 'B':
       crop_top = mid_crop_top
-      cy = allowed_height / 2
     elif crop_type == 'C':
       crop_top = mid_crop_top + height_var
-      cy = allowed_height / 2 - height_var
+    elif crop_type == 'S':
+      crop_top = int(self.shift_h *  img.shape[0])
     else:
       raise ValueError('Unknown crop_type: %s' % crop_type)
+
     crop_bottom = crop_top + allowed_height + 1
-    return img[crop_top:crop_bottom, :, :], cy, crop_top
+
+    return img[crop_top:crop_bottom, :, :], crop_top
 
   def load_image_sequence(self, target_index):
     """Returns a list of images around target index."""
@@ -209,38 +295,63 @@ class Video(object):
 
     for idx in range(start_index, end_index + 1, self.sample_every):
       frame_id = self.frames[idx]
-      img, cy, crop_top = self.load_image_raw(frame_id)
+      img, crop_top = self.load_image_raw(frame_id)
+
+      # since images have been cropped according to the
+      # aspect ratio specified by (img_heigh, img_width)
+      # zoom_y and zoom_x should be very close
       if idx == target_index:
         zoom_y = self.img_height / img.shape[0]
         zoom_x = self.img_width / img.shape[1]
-      # notice the default mode for RGB images is BICUBIC
+
+      # notice the default mode for RGB images rescaling is BICUBIC
       img = np.array(Image.fromarray(img).resize((self.img_width, self.img_height)))
+
       if self.gen_mask:
           mask_seq.append(self._compute_mask(img))
+
       image_seq.append(img)
+
     if self.gen_mask:
-        return image_seq, mask_seq, zoom_x, zoom_y, cy, crop_top
+        return image_seq, mask_seq, zoom_x, zoom_y, crop_top
     else:
-        return image_seq, zoom_x, zoom_y, cy, crop_top
+        return image_seq, zoom_x, zoom_y, crop_top
 
   def load_example(self, target_index):
     """Returns a sequence with requested target frame."""
+
     example = {}
+
     if self.gen_mask:
-        image_seq, mask_seq, zoom_x, zoom_y, cy, crop_top = self.load_image_sequence(target_index)
+        image_seq, mask_seq, zoom_x, zoom_y, crop_top = self.load_image_sequence(target_index)
         example['mask_seq'] = mask_seq
     else:
-        image_seq, zoom_x, zoom_y, cy, crop_top = self.load_image_sequence(target_index)
+        image_seq, zoom_x, zoom_y, crop_top = self.load_image_sequence(target_index)
+
     target_video, target_filename = self.frames[target_index].split('/')
-    # Put A, B, C at the end for better shuffling.
-    target_video = target_video[1:] + target_video[0]
+    if self.crop == 'multi_crops':
+        # Put A, B, C at the end for better shuffling.
+        target_video = target_video[1:] + target_video[0]
+    elif self.crop == 'shift_h':
+        target_video = target_video[1:]
+
+    # first adjust intrinsics due to cropping
     intrinsics = self.load_intrinsics(target_index, crop_top)
+    # then adjust intrinsics due to rescaling
     intrinsics = self.scale_intrinsics(intrinsics, zoom_x, zoom_y)
+
     example['intrinsics'] = intrinsics
     example['image_seq'] = image_seq
     example['folder_name'] = target_video
     example['file_name'] = target_filename.split('.')[0]
     return example
+
+  def load_intrinsics(self, unused_frame_idx, crop_top):
+    """Load intrinsics."""
+    intrinsics = np.array([[1783.8784, 0.0, 309.5386],
+                           [0, 1776.7683, 311.0264-crop_top],
+                           [0, 0, 1.0]])
+    return intrinsics
 
   def scale_intrinsics(self, mat, sx, sy):
     out = np.copy(mat)
@@ -250,8 +361,13 @@ class Video(object):
     out[1, 2] *= sy
     return out
 
-def get_resource_path(relative_path):
-  return relative_path
+  def delete_temp_images(self):
+      """ Delete the intially converted images from videos """
+      for video_dir in self.video_dirs:
+          try:
+              shutil.rmtree(video_dir)
+          except:
+              assert False, f'error occurred while deleting {temp_vfolder}'
 
 def get_seq_start_end(target_index, seq_length, sample_every=1):
   """Returns absolute seq start and end indices for a given target frame."""
@@ -261,156 +377,9 @@ def get_seq_start_end(target_index, seq_length, sample_every=1):
   return start_index, end_index
 
 def atoi(text):
+  """ Transform a string to digit if possible """
   return int(text) if text.isdigit() else text
 
 def natural_keys(text):
   return [atoi(c) for c in re.split(r'(\d+)', text)]
 
-def vid2img(video_files, save_dir, fps=5, crop=True, crop_h1=0, crop_h2=720,
-            crop_w1=0, crop_w2=1280, resize=False, target_h=128, target_w=416,
-            shift_h=0.15, shift_w=0.0, img_ext='.jpg'):
-
-    parent = os.path.abspath(
-            os.path.expanduser(save_dir)
-            )
-
-    for video in video_files:
-
-        print(f'converting {video} into images')
-
-        # get the camera intrinsics once per video
-        #k = get_cam_intrinsics(data_name, vf)
-
-        vidcap = cv2.VideoCapture(video)
-        
-        # get the approximate number of frames
-        frame_count = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
-        # get the approximate frame rate 
-        raw_fps = vidcap.get(cv2.CAP_PROP_FPS)
-
-        if fps:
-            # original fps
-            assert raw_fps >= fps, "the specified fps is higher than the raw video"
-            # the period of saving images from the video
-            period = round(raw_fps/fps)
-        else:
-            # save every frame
-            period = 1
-
-        if frame_count==0:
-            print('frame count cannot be read')
-        else:
-            print(f'there are {frame_count} frames in the video')
-
-        print(f'save images at {fps} fps')
-
-        # the folder to save images of a specific root
-        path = os.path.join(
-                parent,
-                os.path.basename(video).split('.')[0]
-                )
-
-        if not os.path.exists(path):
-            os.makedirs(path)
-
-        count = 0
-        while True:
-
-            success, image = vidcap.read()
-
-            # repeat if video reading has not started
-            if vidcap.get(cv2.CAP_PROP_POS_MSEC) == 0.0:
-                success, image = vidcap.read()
-
-            if success:
-                if count%period == 0:
-                    save_idx = count//period
-                    if crop:
-                        image = image[
-                                crop_h1:crop_h2,
-                                crop_w1:crop_w2,
-                                :]
-
-                    if resize:
-                       image, ratio, delta_u, delta_v = image_resize(image,
-                                                                     target_h,
-                                                                     target_w,
-                                                                     shift_h,
-                                                                     shift_w)
-
-                    # save frame as jpeg file      
-                    cv2.imwrite(
-                            os.path.join(
-                                path,
-                                "{:010d}{}".format(save_idx, img_ext)
-                                ),
-                            image
-                            )
-
-                if count%500 == 0:
-                    print(f'{count} raw frames have been processed')
-
-                count+=1
-            else:
-                break
-
-def image_resize(image, target_h, target_w, shift_h, shift_w,
-                 inter = cv2.INTER_AREA):
-    # initialize the dimensions of the image to be resized and
-    # get the raw image size
-
-    is_pil = isinstance(image, Image.Image)
-
-    if is_pil:
-        image = np.array(image)
-
-    (raw_h, raw_w) = image.shape[:2]
-
-    assert raw_h >= target_h, 'must be downscaling'
-    assert raw_w >= target_w, 'must be downscaling'
-
-    if target_h/raw_h <= target_w/raw_w:
-        # calculate the ratio of the width and construct the dimensions
-        r = target_w / float(raw_w)
-        dim = (target_w, int(raw_h * r))
-
-        # downscale the image
-        image = cv2.resize(image, dim, interpolation = inter)
-        (new_h, new_w) = image.shape[:2]
-        
-        start = int(new_h*shift_h)
-        end = start + target_h
-       
-        assert start >=0
-        assert end <= new_h
-
-        image = image[start:end,:,:]
-
-        delta_u = 0
-        delta_v = start  
-
-    else: 
-        # calculate the ratio of the height and construct the dimensions
-        r = target_h / float(raw_h)
-        dim = (int(raw_w * r), target_h)
-
-        # downscale the image
-        image = cv2.resize(image, dim, interpolation = inter)
-        (new_h, new_w) = image.shape[:2]
-
-        start = int(new_w*shift_w)
-        end = start + target_w
-        image = image[:,start:end,:]
-
-        assert start >=0
-        assert end <= new_w
-
-        image = image[:,start:end,:]
-
-        delta_u = start
-        delta_v = 0
-
-    if is_pil:
-        image = Image.fromarray(image)
-
-    return image, r, delta_u, delta_v

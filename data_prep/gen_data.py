@@ -1,4 +1,4 @@
-# Copyright 2017 The TensorFlow Authors All Rights Reserved.
+# Copyright All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,16 +14,6 @@
 # ==============================================================================
 
 """Generates data for training/validation and save it to disk."""
-
-# Example usage:
-#
-# python dataset/gen_data.py \
-#   --alsologtostderr \
-#   --dataset_name kitti_raw_eigen \
-#   --dataset_dir ~/vid2depth/dataset/kitti-raw-uncompressed \
-#   --save_dir ~/vid2depth/data/kitti_raw_eigen_s3 \
-#   --seq_length 3 \
-#   --num_threads 12
 
 from __future__ import absolute_import
 from __future__ import division
@@ -51,18 +41,32 @@ flags.DEFINE_enum('dataset_name', None, DATASETS, 'Dataset name.')
 flags.DEFINE_string('dataset_dir', None, 'Location for dataset source files.')
 flags.DEFINE_string('save_dir', None, 'Where to save the generated data.')
 flags.DEFINE_string('save_img_ext', 'png', 'image format to save')
+
 # Note: Training time grows linearly with sequence length.  Use 2 or 3.
 flags.DEFINE_integer('seq_length', 3, 'Length of each training sequence.')
 flags.DEFINE_integer('img_height', 128, 'Image height.')
 flags.DEFINE_integer('img_width', 416, 'Image width.')
+# For the video dataset only
+flags.DEFINE_bool(
+        'cut', False, 'if necessary to cut h720 x w1280 '
+        'during the video to image conversion')
+CROPPING = ['multi_crops', 'shift_h']
+flags.DEFINE_enum('crop', None, CROPPING,'how to crop the images')
+flags.DEFINE_float('shift_h', 0.1, 'the ratio representing the starting '
+                     'point from the top to crop img_height')
+# TODO add demo to interactive adjust shift_h
 flags.DEFINE_integer('fps', 10, 'frames per second to sample from videos.')
+flags.DEFINE_bool( 'delete_temp', False, 'delete temporary converted images '
+                   'from videos')
+
 flags.DEFINE_integer(
     'num_threads', None, 'Number of worker threads. '
     'Defaults to number of CPU cores.')
-flags.DEFINE_string('gen_mask', None, 'Where to save the generated data.')
+flags.DEFINE_bool('gen_mask', False, 'Where to save the generated data.')
 flags.mark_flag_as_required('dataset_name')
 flags.mark_flag_as_required('dataset_dir')
 flags.mark_flag_as_required('save_dir')
+flags.mark_flag_as_required('crop')
 
 # Process data in chunks for reporting progress.
 NUM_CHUNKS = 100
@@ -78,7 +82,11 @@ def _generate_data():
                                          img_height=FLAGS.img_height,
                                          img_width=FLAGS.img_width,
                                          seq_length=FLAGS.seq_length,
+                                         cut = FLAGS.cut,
+                                         crop = FLAGS.crop,
+                                         shift_h = FLAGS.shift_h,
                                          fps=FLAGS.fps,
+                                         img_ext = FLAGS.save_img_ext,
                                          gen_mask=FLAGS.gen_mask)
 
   elif FLAGS.dataset_name == 'kitti_raw_eigen':
@@ -163,7 +171,7 @@ def _generate_data():
                   train_f.write('%s %s\n' % (s, frame))
       pool.close()
       pool.join()
-  if FLAGS.dataset_name='video':
+  if FLAGS.dataset_name=='video' and FLAGS.delete_temp:
       dataloader.delete_temp_images()
   
   
