@@ -102,7 +102,36 @@ KITTI_raw/
 ### Convert Raw to Training Data
 
 ```
-$ python 
+$ dataset_name=kitti_raw_eigen        # or kitti_raw_stereo, it only affects the contents of the test dataset
+$ dataset_dir=./KITTI_raw             # folder of the KITTI raw data
+$ save_dir=./KITTI_processed          # folder to save the processed data, you can choose any folder
+$ python data_prep/gen_data.py --dataset_name=$dataset_name  \
+                               --dataset_dir=$dataset_dir \ 
+                               --save_dir=$save_dir \
+                               --gen_mak       # optional, whether or not to generate possibly mobile masks
+```
+
+```
+KITTI_processed/
+├── 2011_09_26_drive_0001_sync_02
+├── 2011_09_26_drive_0001_sync_03
+├── train.txt
+└── val.txt
+```
+```
+KITTI_processed/2011_09_26_drive_0001_sync_02
+├── 0000000001-fseg.png
+├── 0000000001.png
+├── 0000000001_cam.txt
+├── 0000000002-fseg.png
+├── 0000000002.png
+├── 0000000002_cam.txt
+.
+.
+.
+├── 0000000106-fseg.png
+├── 0000000106.png
+└── 0000000106_cam.txt
 ```
     
 </p>
@@ -111,7 +140,50 @@ $ python
 <details><summary><strong>Your Own Videos</strong></summary>
 <p>
 
-    
+```
+My_Videos/
+├── video_1.mp4
+├── video_2.mp4
+└── video_3.mp4
+```
+
+
+
+```
+$ dataset_name=video
+$ dataset_dir=./My_Videos            # folder of the KITTI raw data
+$ save_dir=./My_Videos_processed     # folder to save the processed data, you can choose any folder.
+$ crop=single                        # or multi, to determine how to crop images before rescaling them
+$ python data_prep/gen_data.py --dataset_name=$dataset_name  \
+                               --dataset_dir=$dataset_dir \ 
+                               --save_dir=$save_dir \
+                               --gen_mak       # optional, whether or not to generate possibly mobile masks
+```
+when `$ crop=single`
+```
+My_Videos_processed/
+├── train.txt
+├── val.txt
+├── video_1
+├── video_2
+└── video_3
+```
+when `$ crop=multi`
+```
+My_Videos_processed/
+├── train.txt
+├── val.txt
+├── video_1A
+├── video_1B
+├── video_1C
+├── video_2A
+├── video_2B
+├── video_2C
+├── video_3A
+├── video_3B
+└── video_3C
+```
+
 </p>
 </details>
 
@@ -174,6 +246,6 @@ $ python -m depth_and_motion_learning.depth_motion_field_train --model_dir=../te
 </p>
 </details>
 
-## Inference
+## Inference (under development)
 
-## How to Contribute
+## How to Contribute (under development)
