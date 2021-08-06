@@ -365,9 +365,9 @@ class Video(object):
       """ Delete the intially converted images from videos """
       for video_dir in self.video_dirs:
           try:
-              shutil.rmtree(video_dir)
+              shutil.rmtree(os.path.join(self.dataset_dir, video_dir))
           except:
-              assert False, f'error occurred while deleting {temp_vfolder}'
+              assert False, f'error occurred while deleting {video_dir}'
 
 def get_seq_start_end(target_index, seq_length, sample_every=1):
   """Returns absolute seq start and end indices for a given target frame."""
