@@ -58,7 +58,7 @@ class Video(object):
                seq_length=3,
                sample_every=1,
                cut = False,
-               crop = 'multi_crops',
+               crop = 'multi',
                shift_h = 0.0,
                fps=10,
                img_ext='png',
@@ -218,12 +218,12 @@ class Video(object):
       # when the image indices are not formated to same digits
       im_files = sorted(im_files, key=natural_keys)
 
-      if self.crop == 'multi_crops':
+      if self.crop == 'multi':
           # Adding 3 crops of the video.
           frames.extend(['A' + video_dir + '/' + os.path.basename(f) for f in im_files])
           frames.extend(['B' + video_dir + '/' + os.path.basename(f) for f in im_files])
           frames.extend(['C' + video_dir + '/' + os.path.basename(f) for f in im_files])
-      elif self.crop == 'shift_h':
+      elif self.crop == 'single':
           frames.extend(['S' + video_dir + '/' + os.path.basename(f) for f in im_files])
       else:
           raise NotImplementedError(f'crop {self.crop} not supported')
@@ -329,10 +329,10 @@ class Video(object):
         image_seq, zoom_x, zoom_y, crop_top = self.load_image_sequence(target_index)
 
     target_video, target_filename = self.frames[target_index].split('/')
-    if self.crop == 'multi_crops':
+    if self.crop == 'multi':
         # Put A, B, C at the end for better shuffling.
         target_video = target_video[1:] + target_video[0]
-    elif self.crop == 'shift_h':
+    elif self.crop == 'single':
         target_video = target_video[1:]
 
     # first adjust intrinsics due to cropping

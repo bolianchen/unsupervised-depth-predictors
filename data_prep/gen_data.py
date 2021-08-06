@@ -50,8 +50,8 @@ flags.DEFINE_integer('img_width', 416, 'Image width.')
 flags.DEFINE_bool(
         'cut', False, 'if necessary to cut h720 x w1280 '
         'during the video to image conversion')
-CROPPING = ['multi_crops', 'shift_h']
-flags.DEFINE_enum('crop', 'multi_crops', CROPPING,'how to crop the images')
+CROPPING = ['multi', 'single']
+flags.DEFINE_enum('crop', 'multi', CROPPING,'how to crop the images')
 flags.DEFINE_float('shift_h', 0.1, 'the ratio representing the starting '
                      'point from the top to crop img_height')
 # TODO add demo to interactive adjust shift_h
