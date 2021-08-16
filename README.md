@@ -1,6 +1,6 @@
 # Unsupervised Depth Predictors
 ## Introduction
-We are developing an algorithm prototype to estimate depth for advanced driver-assistance systems (ADAS). A branch of unsupervised deep learning methods pioneered by SfMLearner seems promising due to the lack of lidars or stereo cameras on our systems. Eventually, we also like to tackle the artifacts caused by relative motions of objects to the camera. For the purpose, this repository aims to facilitate the use of several Google's publications by revising and reorganizing their official codes.
+We are developing an algorithm prototype to estimate depth for advanced driver-assistance systems (ADAS). For the purpose, we include several Google's publications in this repository, which follows SfMLearner but involving innovative elements to deal with relative motions. Their official codes are revised and reorganized to facilitate the usage.
 
 <details><summary><strong>struct2depth</strong></summary>
 <p>
@@ -39,7 +39,7 @@ We are developing an algorithm prototype to estimate depth for advanced driver-a
 </p>
 </details>
 
-Segmentation masks of the training images are generated based on [**matterport/Mask_RCNN**](https://github.com/matterport/Mask_RCNN/tree/3deaec5d902d16e1daf56b62d5971d428dc920bc). 
+Codes to generate possibly mobile masks are based on [**matterport/Mask_RCNN**](https://github.com/matterport/Mask_RCNN/tree/3deaec5d902d16e1daf56b62d5971d428dc920bc). 
 
 ## Environment Setup
 
