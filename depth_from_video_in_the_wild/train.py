@@ -22,6 +22,7 @@ from __future__ import print_function
 import io
 import math
 import os
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 import random
 import time
 from absl import app

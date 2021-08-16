@@ -20,10 +20,13 @@ from __future__ import division
 
 from __future__ import print_function
 
+import os
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 from absl import app
 
 from depth_and_motion_learning import depth_motion_field_model
 from depth_and_motion_learning import training_utils
+
 
 
 def main(argv):
