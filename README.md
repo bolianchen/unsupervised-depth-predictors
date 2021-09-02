@@ -147,8 +147,6 @@ My_Videos/
 └── video_3.mp4
 ```
 
-
-
 ```
 $ dataset_name=video
 $ dataset_dir=./My_Videos            # folder of the KITTI raw data
