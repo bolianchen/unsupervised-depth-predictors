@@ -195,11 +195,13 @@ My_Videos_processed/
 <p>
 
 ```
+$ DATA_DIR=KITTI_processed # the directory to your processed data
+$ MY_IMAGENET_CHECKPOINT=Imagenet_ckpt/model.ckpt
 $ python struct2depth/train.py --logtostderr \
-                               --checkpoint_dir ../test_struct2depth \
-                               --data_dir ./KITTI_processed \
+                               --checkpoint_dir $Where_To_Save_Model \
+                               --data_dir $DATA_DIR \
                                --architecture resnet \
-                               --imagenet_ckpt ./Imagenet_ckpt/model.ckpt
+                               --imagenet_ckpt $MY_IMAGENET_CHECKPOINT
                                --epochs 20
 ```
 
@@ -208,7 +210,7 @@ $ python struct2depth/train.py --logtostderr \
 
 <details><summary><strong>vid2depth (pending)</strong></summary>
 <p>
-I failed to compile the ICP op, so it's pending.
+I failed to compile the ICP op, so it's pending and not prioritized for now.
 </p>
 </details>
 
@@ -216,8 +218,10 @@ I failed to compile the ICP op, so it's pending.
 <p>
 
 ```
-$ python -m depth_from_video_in_the_wild.train --checkpoint_dir=$MY_CHECKPOINT_DIR \
-                                               --data_dir=$MY_DATA_DIR \
+$ DATA_DIR=KITTI_processed                  # the directory to your processed data
+$ MY_IMAGENET_CHECKPOINT=Imagenet_ckpt/model.ckpt
+$ python -m depth_from_video_in_the_wild.train --checkpoint_dir=$WHERE_TO_SAVE_MODEL \
+                                               --data_dir=$DATA_DIR               \
                                                --imagenet_ckpt=$MY_IMAGENET_CHECKPOINT
 ```
     
@@ -229,8 +233,7 @@ $ python -m depth_from_video_in_the_wild.train --checkpoint_dir=$MY_CHECKPOINT_D
 <p>
     
 ```
-$ model_dir=dir_to_save_your_model
-$ python -m depth_and_motion_learning.depth_motion_field_train --model_dir=../test_motion \
+$ python -m depth_and_motion_learning.depth_motion_field_train --model_dir=$WHERE_TO_SAVE_MODEL \
                                                                --epoch=20
                                                                --param_overrides='{
                                                                  "model": { 
@@ -248,6 +251,34 @@ $ python -m depth_and_motion_learning.depth_motion_field_train --model_dir=../te
 </p>
 </details>
 
-## Inference (under development)
+## Inference
+
+<details><summary><strong>depth_from_video_in_the_wild</strong></summary>
+<p>
+
+```
+$ python -m depth_from_video_in_the_wild.depth_inference --test_file_dir=$TEST_IMAGES_DIR
+                                                         --checkpoint_dir=$MODEL_CHECKPOINT \
+                                                         --output_dir=$WHERE_TO_SAVE_RESULTS
+                                                         --output_img_disp # output concatnation of original images with depths   
+```
+    
+</p>
+</details>
+
+<details><summary><strong>depth_and_motion_learning</strong></summary>
+<p>
+    
+```
+$ python -m depth_and_motion_learning.depth_inference --test_file_dir=$TEST_IMAGES_DIR
+                                                      --checkpoint_dir=$MODEL_CHECKPOINT \
+                                                      --output_dir=$WHERE_TO_SAVE_RESULTS
+                                                      --output_img_disp # output concatnation of original images with depths
+```
+
+</p>
+</details>
 
 ## How to Contribute (under development)
+
+Welcome to leave messages to the Issues panel for further discussion.
