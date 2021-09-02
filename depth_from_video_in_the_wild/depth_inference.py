@@ -19,6 +19,7 @@ from __future__ import print_function
 
 import math
 import os
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 import threading
 import time
 
@@ -39,20 +40,20 @@ import matplotlib.pyplot as plt
 import PIL.Image as pil
 
 flags.DEFINE_string('test_file_dir', None,
-                    'Directory where the odomotry test sets are.')
+                    'Directory where the test images are')
 flags.DEFINE_string(
     'output_dir', None, 'Directory to store predictions. '
     'Subdirectories will be created for each checkpoint.')
 flags.DEFINE_string(
-    'file_extension', None, 'Directory to store predictions. '
-    'Subdirectories will be created for each checkpoint.')
+    'file_extension', 'jpg', 'format of the saved images')
 flags.DEFINE_string('checkpoint_path', None,
-                    'Directory containing checkpoints '
-                    'to evaluate.')
+                    'path of the checkpoint to evaluate')
 flags.DEFINE_integer('img_height', 128, 'Input frame height.')
 flags.DEFINE_integer('img_width', 416, 'Input frame width.')
 flags.DEFINE_bool('output_img_disp', False, 'save depth in picture format')
 flags.DEFINE_bool('output_npy', False, 'save depth in numeric format')
+
+# options below only effective if there are multiple test images in test_file_dir
 flags.DEFINE_bool('output_anime', False, 'save gif')
 flags.DEFINE_integer('max_count', 0, 'maximum number of images to do inference')
 

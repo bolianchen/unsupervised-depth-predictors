@@ -19,6 +19,7 @@ from __future__ import print_function
 
 import math
 import os
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 import threading
 import time
 
@@ -46,7 +47,7 @@ flags.DEFINE_string(
     'output_dir', None, 'Directory to store predictions. '
     'Subdirectories will be created for each checkpoint.')
 flags.DEFINE_string(
-    'file_extension', 'png', 'Directory to store predictions. '
+    'file_extension', 'jpg', 'Directory to store predictions. '
     'Subdirectories will be created for each checkpoint.')
 flags.DEFINE_string('checkpoint_path', None,
                     'Directory containing checkpoints '
@@ -86,6 +87,15 @@ def depth_inference():
     depth_predictor = depth_prediction_nets.ResNet18DepthPredictor(
         tf.estimator.ModeKeys.PREDICT, params.depth_predictor_params.as_dict())
 
+    input_image = tf.placeholder(
+        tf.float32, [batch_size, FLAGS.img_height, FLAGS.img_width, 3])
+    
+    est_depth = depth_predictor.predict_depth(input_image)
+
+    saver = tf.train.Saver()
+    sess = tf.Session()
+    saver.restore(sess, FLAGS.checkpoint_path)
+
     # Note that the struct2depth code only works at batch_size=1, because it uses
     # the training mode of batchnorm at inference.
 
@@ -110,13 +120,13 @@ def depth_inference():
     if FLAGS.output_anime:
         multi_img_disp = []
         anime_name = os.path.basename(FLAGS.test_file_dir) + '.gif'
+
     for i in range(len(im_files)):
         if i % 100 == 0:
             logging.info('%s of %s files processed.', i, len(im_files))
 
         # Read image
         im = load_image(im_files[i], resize=(FLAGS.img_width, FLAGS.img_height))
-
         im_batch.append(im)
 
         if len(im_batch) == batch_size or i == len(im_files) - 1:
@@ -127,24 +137,25 @@ def depth_inference():
                              dtype=np.float32))
 
             # original images in numpy format
-            im_batch_o = np.stack(im_batch, axis=0)
+            im_batch = np.stack(im_batch, axis=0)
 
             # original images converted to tensors
-            im_batch = tf.convert_to_tensor(im_batch_o)
-            if im_batch.shape.rank != 4:
-                raise ValueError('im_batch should have rank 4, not %d.' %
-                                 im_batch.shape.rank)
+            #im_batch = tf.convert_to_tensor(im_batch_o)
+            #if im_batch.shape.rank != 4:
+            #    raise ValueError('im_batch should have rank 4, not %d.' %
+            #                     im_batch.shape.rank)
             # build the graph
-            est_depth = depth_predictor.predict_depth(im_batch)
-            saver = tf.train.Saver()
-            sess = tf.Session()
-            saver.restore(sess, FLAGS.checkpoint_path)
+            # est_depth = depth_predictor.predict_depth(im_batch)
+
+            # saver = tf.train.Saver()
+            # sess = tf.Session()
+            # saver.restore(sess, FLAGS.checkpoint_path)
             # run inference and return depth
-            depth = sess.run(est_depth)
+            depth = sess.run(est_depth, feed_dict={input_image: im_batch})
 
             for j in range(len(depth)):
                 color_map = normalize_depth_for_display(np.squeeze(depth[j]))
-                visualization = np.concatenate((im_batch_o[j], color_map),
+                visualization = np.concatenate((im_batch[j], color_map),
                                                axis=0)
                 k = i - len(depth) + 1 + j
                 filename_root = os.path.splitext(os.path.basename(
