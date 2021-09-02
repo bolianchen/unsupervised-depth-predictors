@@ -1,6 +1,6 @@
 # Unsupervised Depth Predictors
 ## Introduction
-We are developing an algorithm prototype to estimate depth for advanced driver-assistance systems (ADAS). For the purpose, we include several Google's publications in this repository, which follows SfMLearner but involving innovative elements to deal with relative motions. Their official codes are revised and reorganized to facilitate the usage.
+We are developing an algorithm prototype to estimate depth for advanced driver-assistance systems (ADAS). For the purpose, we include several Google's publications in this repository, which follows SfMLearner but involving innovative elements to deal with relative motions. We tried to revise and reorganize their official codes to facilitate the usage.
 
 <details><summary><strong>struct2depth</strong></summary>
 <p>
