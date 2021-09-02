@@ -206,9 +206,9 @@ $ python struct2depth/train.py --logtostderr \
 </p>
 </details>
 
-<details><summary><strong>vid2depth (under development)</strong></summary>
+<details><summary><strong>vid2depth (pending)</strong></summary>
 <p>
-
+I failed to compile the ICP op, so it's pending.
 </p>
 </details>
 
@@ -227,9 +227,11 @@ $ python -m depth_from_video_in_the_wild.train --checkpoint_dir=$MY_CHECKPOINT_D
 
 <details><summary><strong>depth_and_motion_learning</strong></summary>
 <p>
-
+    
 ```
+$ model_dir=dir_to_save_your_model
 $ python -m depth_and_motion_learning.depth_motion_field_train --model_dir=../test_motion \
+                                                               --epoch=20
                                                                --param_overrides='{
                                                                  "model": { 
                                                                    "input": {
