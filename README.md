@@ -157,7 +157,7 @@ $ crop=single                        # or multi, to determine how to crop images
 $ python data_prep/gen_data.py --dataset_name=$dataset_name  \
                                --dataset_dir=$dataset_dir \ 
                                --save_dir=$save_dir \
-                               --gen_mak       # optional, whether or not to generate possibly mobile masks
+                               --gen_mask       # optional, whether or not to generate possibly mobile masks
 ```
 when `$ crop=single`
 ```
