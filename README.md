@@ -256,7 +256,7 @@ $ python -m depth_and_motion_learning.depth_motion_field_train --model_dir=$WHER
 
 ```
 $ python -m depth_from_video_in_the_wild.depth_inference --test_file_dir=$TEST_IMAGES_DIR
-                                                         --checkpoint_dir=$MODEL_CHECKPOINT \
+                                                         --checkpoint_path=$MODEL_CHECKPOINT \
                                                          --output_dir=$WHERE_TO_SAVE_RESULTS
                                                          --output_img_disp # output concatnation of original images with depths   
 ```
@@ -269,7 +269,7 @@ $ python -m depth_from_video_in_the_wild.depth_inference --test_file_dir=$TEST_I
     
 ```
 $ python -m depth_and_motion_learning.depth_inference --test_file_dir=$TEST_IMAGES_DIR
-                                                      --checkpoint_dir=$MODEL_CHECKPOINT \
+                                                      --checkpoint_path=$MODEL_CHECKPOINT \
                                                       --output_dir=$WHERE_TO_SAVE_RESULTS
                                                       --output_img_disp # output concatnation of original images with depths
 ```
